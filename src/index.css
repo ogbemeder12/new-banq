@@ -1,0 +1,140 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Dark background from wallet lookup */
+    --background: 260 25% 9%;
+    /* Light foreground text */
+    --foreground: 220 13% 91%;
+    --card: 260 25% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 260 25% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 265 100% 64%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 145 80% 51%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 260 25% 15%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 265 100% 64%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 260 25% 15%;
+    --input: 260 25% 15%;
+    --ring: 260 70% 70%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground overflow-x-hidden;
+  }
+}
+
+.solana-gradient {
+  background: linear-gradient(45deg, #9945FF, #14F195);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.solana-button-gradient {
+  background: linear-gradient(45deg, #9945FF, #14F195);
+}
+
+.solana-button-gradient:hover {
+  background: linear-gradient(45deg, #8a3dec, #0cd985);
+}
+
+/* Enhanced Phone Input Styling */
+.phone-input-wrapper {
+  padding: 0.5rem;
+  position: relative;
+}
+
+.PhoneInput {
+  display: flex;
+  align-items: center;
+  height: 2.5rem;
+  width: 100%;
+}
+
+.PhoneInputInput {
+  background-color: transparent !important;
+  color: hsl(var(--foreground)) !important;
+  border: none !important;
+  padding: 0.5rem !important;
+  width: 100% !important;
+  height: 100% !important;
+  outline: none !important;
+  font-size: 1rem !important;
+  flex: 1;
+}
+
+.PhoneInputCountry {
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  margin-right: 0.5rem;
+  color: hsl(var(--foreground)) !important;
+  position: relative;
+  min-width: 80px;
+}
+
+.PhoneInputCountryIcon {
+  width: 24px !important;
+  height: auto !important;
+  opacity: 1 !important;
+  margin-right: 0.5rem;
+}
+
+.PhoneInputCountrySelectArrow {
+  color: hsl(var(--foreground)) !important;
+  opacity: 1 !important;
+  margin-left: 0.25rem;
+}
+
+.PhoneInputCountrySelect {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Custom style for the mock verification code display */
+.mock-code-display {
+  background-color: hsl(var(--muted));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  font-family: monospace;
+  font-size: 1.25rem;
+  letter-spacing: 0.25rem;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+/* Enhanced visibility for phone input */
+.PhoneInput {
+  --PhoneInputCountryFlag-height: 20px;
+  --PhoneInputCountryFlag-width: 30px;
+  --PhoneInputCountrySelect-marginRight: 0.5rem;
+}
+
+.PhoneInputCountrySelect option {
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--card));
+  padding: 0.5rem;
+}
