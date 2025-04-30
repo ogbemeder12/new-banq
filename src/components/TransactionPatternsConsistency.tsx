@@ -6,7 +6,7 @@ type Transaction = {
   signature?: string;
   timestamp?: number;
   blockTime?: number;
-  amount?: string;
+  amount?: string | number;
   currency?: string;
 };
 
@@ -46,23 +46,59 @@ function getMinBalance(transactions: Transaction[], currentBalance: number) {
   // Handle empty transactions
   if (!transactions || transactions.length === 0) return currentBalance;
   
-  // Simulate running balance from the latest to oldest using SOL-only txs
-  let balance = currentBalance || 0;
-  let minBalance = currentBalance || 0;
+  console.log(`Calculating minimum balance from ${transactions.length} transactions with current balance ${currentBalance}`);
   
-  // Sort transactions by timestamp (newest first)
-  const sortedTx = [...transactions].sort((a, b) => 
-    ((b.timestamp || b.blockTime || 0) - (a.timestamp || a.blockTime || 0))
+  // Filter for SOL transactions only
+  const solTransactions = transactions.filter(tx => 
+    !tx.currency || tx.currency.toUpperCase() === 'SOL'
   );
   
+  console.log(`Found ${solTransactions.length} SOL transactions for min balance calculation`);
+  
+  // Sort transactions by timestamp (newest first)
+  const sortedTx = [...solTransactions].sort((a, b) => {
+    const timestampA = a.timestamp || a.blockTime || 0;
+    const timestampB = b.timestamp || b.blockTime || 0;
+    return timestampB - timestampA;
+  });
+  
+  // Simulate running balance from the latest to oldest
+  let runningBalance = currentBalance || 0;
+  let minBalance = currentBalance || 0;
+  let balances: {timestamp: number, balance: number, txSignature: string}[] = [];
+  
+  console.log(`Starting balance simulation from current balance: ${runningBalance}`);
+  
   for (const tx of sortedTx) {
-    if (tx.currency === "SOL" && typeof tx.amount !== "undefined") {
-      const amount = parseFloat(tx.amount);
-      if (!isNaN(amount)) {
-        balance -= amount;
-        minBalance = Math.min(minBalance, balance);
-      }
+    const amount = typeof tx.amount === 'string' ? 
+      parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+      (typeof tx.amount === 'number' ? tx.amount : 0);
+    
+    if (!isNaN(amount)) {
+      // For inflows (positive amounts) we subtract when going backwards in time
+      // For outflows (negative amounts) we add when going backwards in time
+      runningBalance -= amount;
+      
+      console.log(`Transaction ${tx.signature?.substring(0, 6) || 'unknown'} with amount ${amount}, new balance: ${runningBalance}`);
+      
+      // Track all historical balances
+      balances.push({
+        timestamp: tx.timestamp || tx.blockTime || 0,
+        balance: runningBalance,
+        txSignature: tx.signature || 'unknown'
+      });
+      
+      minBalance = Math.min(minBalance, runningBalance);
     }
+  }
+  
+  console.log(`Final minimum balance from historical simulation: ${minBalance}`);
+  
+  // Check all balances to find the true minimum
+  if (balances.length > 0) {
+    balances.sort((a, b) => a.balance - b.balance);
+    const lowestBalanceRecord = balances[0];
+    console.log(`Lowest balance found: ${lowestBalanceRecord.balance} from transaction ${lowestBalanceRecord.txSignature.substring(0, 6)}`);
   }
   
   return minBalance;
@@ -98,10 +134,13 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
   currentBalance
 }) => {
   const avgWeeklyTx = computeWeeklyActivity(transactions);
-  const minSolBuffer = getMinBalance(
-    transactions.filter(t => t.currency === "SOL"),
-    currentBalance
+  
+  // Only include SOL transactions in minimum balance calculation
+  const solTransactions = transactions.filter(tx => 
+    !tx.currency || tx.currency.toUpperCase() === 'SOL'
   );
+  
+  const minSolBuffer = getMinBalance(solTransactions, currentBalance);
 
   const score = getScore({
     avgWeeklyTx,
@@ -113,7 +152,8 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
     minSolBuffer,
     currentBalance,
     score,
-    transactionsCount: transactions.length 
+    transactionsCount: transactions.length,
+    solTransactionsCount: solTransactions.length
   });
 
   return (

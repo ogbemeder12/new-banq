@@ -189,7 +189,7 @@ async function executeWithRateLimit(requests: (() => Promise<any>)[]) {
 }
 
 /**
- * Extract amount from native transfers or token transfers
+ * Enhanced function to extract amount from native transfers or token transfers
  * @param transaction - The transaction object from Helius API
  * @param walletAddress - The wallet address to determine inflow/outflow
  */
@@ -313,7 +313,19 @@ function extractTransactionAmount(transaction: any, walletAddress: string): { am
         if (account.tokenBalanceChanges && account.tokenBalanceChanges.length > 0) {
           for (const tokenChange of account.tokenBalanceChanges) {
             if (tokenChange && tokenChange.userAccount === walletAddress) {
-              amount = parseFloat(tokenChange.amount || '0');
+              // Parse the raw token amount with proper decimal handling
+              if (tokenChange.rawTokenAmount) {
+                const rawAmount = tokenChange.rawTokenAmount.tokenAmount;
+                const decimals = tokenChange.rawTokenAmount.decimals || 0;
+                if (rawAmount && decimals) {
+                  amount = parseInt(rawAmount) / Math.pow(10, decimals);
+                } else {
+                  amount = parseFloat(tokenChange.amount || '0');
+                }
+              } else {
+                amount = parseFloat(tokenChange.amount || '0');
+              }
+              
               currency = tokenChange.symbol || tokenChange.mint || "Unknown Token";
               console.log(`Found token balance change: ${amount} ${currency}`);
               return { amount, currency };
@@ -365,7 +377,7 @@ function extractTransactionAmount(transaction: any, walletAddress: string): { am
  * @param limit - Number of transactions to fetch
  * @param beforeSignature - Optional signature to paginate before
  */
-export const fetchTransactionHistory = async (input: string, limit: number = 5, beforeSignature?: string) => {
+export const fetchTransactionHistory = async (input: string, limit: number = 20, beforeSignature?: string) => {
   let retries = 0;
   
   while (retries < MAX_RETRIES) {

@@ -56,7 +56,7 @@ const TokenPortfolioHealth: React.FC<TokenPortfolioHealthProps> = ({ transaction
 
     // Process transactions to gather token data
     transactions.forEach(tx => {
-      console.log("Processing transaction:", tx.signature?.substring(0, 6));
+      console.log("Processing transaction for token portfolio:", tx.signature?.substring(0, 6));
       
       // Process token transfers if available
       if (tx.tokenTransfers && Array.isArray(tx.tokenTransfers)) {
@@ -163,26 +163,58 @@ const TokenPortfolioHealth: React.FC<TokenPortfolioHealthProps> = ({ transaction
 
     console.log(`Blue chip percentage: ${blueChipPercentage.toFixed(2)}%, Stablecoin ratio: ${stablecoinRatio.toFixed(2)}%`);
 
-    // Extract metrics from other components' calculations
-    const netFlowRatio = calculateNetFlowRatio(transactions);
-    const retentionScore = calculateRetentionMetrics(transactions);
-    const stabilityScore = calculateStabilityScore(transactions);
+    // Calculate portfolio score with corrected mapping
+    // High blue chip percentage should result in a high score
+    let portfolioScore: number;
+    
+    // If blue chip percentage is very high (>90%), the score should reflect that directly
+    if (blueChipPercentage > 90) {
+      // For very high blue chip percentages, score should be almost equal to percentage
+      portfolioScore = blueChipPercentage;
+      console.log(`Very high blue chip percentage, setting score directly to ${portfolioScore.toFixed(1)}`);
+    } else {
+      // Calculate weighted final score using other metrics for lower blue chip percentages
+      const netFlowRatio = calculateNetFlowRatio(transactions);
+      const retentionScore = calculateRetentionMetrics(transactions);
+      const stabilityScore = calculateStabilityScore(transactions);
 
-    console.log(`Metrics - Net flow: ${netFlowRatio.toFixed(2)}, Retention: ${retentionScore.toFixed(2)}, Stability: ${stabilityScore.toFixed(2)}`);
+      console.log(`Metrics - Net flow: ${netFlowRatio.toFixed(2)}, Retention: ${retentionScore.toFixed(2)}, Stability: ${stabilityScore.toFixed(2)}`);
 
-    // Calculate weighted final score
-    const portfolioScore = calculatePortfolioScore(
-      blueChipPercentage,
-      stablecoinRatio,
-      netFlowRatio,
-      retentionScore,
-      stabilityScore
-    );
+      // Weighted scoring system with revised weights
+      const weights = {
+        blueChip: 0.5,      // Increased weight for blue chip percentage
+        stablecoin: 0.15,
+        netFlow: 0.15,
+        retention: 0.1,
+        stability: 0.1
+      };
+
+      const netFlowScore = ((netFlowRatio + 1) / 2) * 100; // Convert -1 to 1 range to 0-100
+
+      portfolioScore = (
+        (blueChipPercentage * weights.blueChip) +
+        (stablecoinRatio * weights.stablecoin) +
+        (netFlowScore * weights.netFlow) +
+        (retentionScore * weights.retention) +
+        (stabilityScore * weights.stability)
+      );
+      
+      console.log(`Calculated weighted portfolio score: ${portfolioScore.toFixed(1)}`);
+    }
+
+    // Ensure portfolio score is never less than 20
+    portfolioScore = Math.max(20, Math.round(portfolioScore));
+    
+    // If blue chip is 99%+, ensure score is 99+
+    if (blueChipPercentage >= 99) {
+      portfolioScore = Math.max(portfolioScore, Math.round(blueChipPercentage));
+      console.log(`Ensuring score matches blue chip percentage for 99%+ blue chip: ${portfolioScore}`);
+    }
 
     const { scoreBand, scoreColor } = getScoreBanding(portfolioScore);
 
     return {
-      score: Math.round(portfolioScore),
+      score: portfolioScore,
       scoreBand,
       scoreColor,
       tokens: Array.from(tokenMap.values()),
@@ -283,7 +315,10 @@ const calculateRetentionMetrics = (transactions: any[]): number => {
 
   const timestamps = transactions
     .map(tx => tx.timestamp)
+    .filter(Boolean)
     .sort((a, b) => a - b);
+
+  if (timestamps.length < 2) return 0;
 
   const holdTimeInDays = (timestamps[timestamps.length - 1] - timestamps[0]) / (24 * 60 * 60);
   return Math.min(100, (holdTimeInDays / 30) * 100); // Score based on holding period up to 30 days
@@ -296,55 +331,41 @@ const calculateStabilityScore = (transactions: any[]): number => {
   let volatilitySum = 0;
   let count = 0;
 
-  transactions.forEach(tx => {
+  // Sort by timestamp
+  const sortedTransactions = [...transactions]
+    .filter(tx => tx.timestamp && (tx.amount !== undefined))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  if (sortedTransactions.length < 2) return 0;
+
+  // Calculate running balance and volatility
+  let balance = 0;
+  for (const tx of sortedTransactions) {
     const amount = typeof tx.amount === 'string' ? 
       parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
       (typeof tx.amount === 'number' ? tx.amount : 0);
 
     if (!isNaN(amount)) {
-      if (previousBalance !== 0) {
-        const changePercent = Math.abs((amount - previousBalance) / previousBalance) * 100;
+      const oldBalance = balance;
+      balance += amount;
+      
+      if (oldBalance !== 0 && count > 0) {
+        const changePercent = Math.abs((balance - oldBalance) / oldBalance) * 100;
         volatilitySum += changePercent;
         count++;
+      } else {
+        count++;
       }
-      previousBalance = amount;
     }
-  });
+  }
 
-  const averageVolatility = count > 0 ? volatilitySum / count : 100;
-  return Math.max(0, 100 - averageVolatility); // Higher stability = lower volatility
-};
-
-const calculatePortfolioScore = (
-  blueChipPercentage: number,
-  stablecoinRatio: number,
-  netFlowRatio: number,
-  retentionScore: number,
-  stabilityScore: number
-): number => {
-  // Weighted scoring system
-  const weights = {
-    blueChip: 0.3,
-    stablecoin: 0.2,
-    netFlow: 0.2,
-    retention: 0.15,
-    stability: 0.15
-  };
-
-  const netFlowScore = ((netFlowRatio + 1) / 2) * 100; // Convert -1 to 1 range to 0-100
-
-  return (
-    (blueChipPercentage * weights.blueChip) +
-    (stablecoinRatio * weights.stablecoin) +
-    (netFlowScore * weights.netFlow) +
-    (retentionScore * weights.retention) +
-    (stabilityScore * weights.stability)
-  );
+  const averageVolatility = count > 1 ? volatilitySum / (count - 1) : 100;
+  return Math.max(0, 100 - Math.min(100, averageVolatility)); // Higher stability = lower volatility
 };
 
 const getScoreBanding = (score: number): { scoreBand: string; scoreColor: string } => {
-  if (score >= 80) return { scoreBand: 'Excellent', scoreColor: 'text-green-600' };
-  if (score >= 60) return { scoreBand: 'Good', scoreColor: 'text-emerald-500' };
+  if (score >= 90) return { scoreBand: 'Excellent', scoreColor: 'text-green-600' };
+  if (score >= 70) return { scoreBand: 'Good', scoreColor: 'text-emerald-500' };
   if (score >= 40) return { scoreBand: 'Moderate', scoreColor: 'text-amber-500' };
   if (score > 0) return { scoreBand: 'Poor', scoreColor: 'text-red-500' };
   return { scoreBand: 'No Data', scoreColor: 'text-gray-400' };

@@ -22,6 +22,18 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
     let totalInflow = 0;
     let totalOutflow = 0;
 
+    // Only proceed if we have actual transaction data
+    if (!transactions || transactions.length === 0) {
+      console.log("No transaction data available for NetFlowAnalysis");
+      return {
+        netFlowRatio: 0,
+        score: 0,
+        totalInflow: 0,
+        totalOutflow: 0,
+        hasData: false
+      };
+    }
+
     transactions.forEach(tx => {
       try {
         // Handle both string and number amount formats
@@ -49,14 +61,14 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
 
     console.log(`Total inflow: ${totalInflow}, Total outflow: ${totalOutflow}`);
 
-    // Calculate net flow only if there are valid transactions
+    // Calculate net flow only if there are valid transactions with flow data
     if (totalInflow === 0 && totalOutflow === 0) {
       return {
         netFlowRatio: 0,
-        score: 50, // Neutral score when no flow data
+        score: 10, // Assign minimal score instead of zero when no flow data
         totalInflow,
         totalOutflow,
-        hasData: false
+        hasData: transactions.length > 0 // Mark as having data if we have transactions
       };
     }
 
@@ -110,66 +122,59 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Flow Score</span>
-              <span className={`text-lg font-bold ${getScoreColor(score)}`}>{score}</span>
-            </div>
-            <Progress value={score} className="h-2" />
-            <p className={`text-sm ${getScoreColor(score)} font-medium text-center mt-1`}>
-              {hasData ? getScoreCategory(score) : "Insufficient transaction data"}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-green-500">
-                <ArrowUpRight className="h-4 w-4" />
-                <span className="text-sm font-medium">Total Inflow</span>
+          {hasData ? (
+            <>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Flow Score</span>
+                  <span className={`text-lg font-bold ${getScoreColor(score)}`}>{score}</span>
+                </div>
+                <Progress value={score} className="h-2" />
+                <p className={`text-sm ${getScoreColor(score)} font-medium text-center mt-1`}>
+                  {getScoreCategory(score)}
+                </p>
               </div>
-              <p className="text-xl font-bold">
-                <strong>{totalInflow.toFixed(4)} SOL</strong>
-                {solToUsdcRate > 0 && (
-                  <span className="text-gray-500 text-sm ml-2">
-                    (${(totalInflow * solToUsdcRate).toFixed(2)})
-                  </span>
-                )}
-              </p>
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-red-500">
-                <ArrowDownRight className="h-4 w-4" />
-                <span className="text-sm font-medium">Total Outflow</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-green-500">
+                    <ArrowUpRight className="h-4 w-4" />
+                    <span className="text-sm font-medium">Total Inflow</span>
+                  </div>
+                  <p className="text-xl font-bold">
+                    <strong>{totalInflow.toFixed(4)} SOL</strong>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-red-500">
+                    <ArrowDownRight className="h-4 w-4" />
+                    <span className="text-sm font-medium">Total Outflow</span>
+                  </div>
+                  <p className="text-xl font-bold">
+                    <strong>{totalOutflow.toFixed(4)} SOL</strong>
+                  </p>
+                </div>
               </div>
-              <p className="text-xl font-bold">
-                <strong>{totalOutflow.toFixed(4)} SOL</strong>
-                {solToUsdcRate > 0 && (
-                  <span className="text-gray-500 text-sm ml-2">
-                    (${(totalOutflow * solToUsdcRate).toFixed(2)})
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
 
-          {totalInflow === 0 && totalOutflow > 0 && (
-            <div className="mt-2 text-sm text-yellow-600 italic">
-              ⚠️ Wallet is sending funds using previous balance. No recent inflows.
+              {totalInflow === 0 && totalOutflow > 0 && (
+                <div className="mt-2 text-sm text-yellow-600 italic">
+                  ⚠️ Wallet is sending funds using previous balance. No recent inflows.
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <p className="text-sm text-muted-foreground">
+                  Net Flow Ratio: {(netFlowRatio * 100).toFixed(1)}%
+                </p>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No transaction flow data detected in API results.</p>
+              <p className="text-sm text-muted-foreground mt-2">Please try fetching more transactions.</p>
             </div>
           )}
-
-          {!hasData && (
-            <div className="mt-2 text-sm text-muted-foreground">
-              No valid transaction flow data available. Try fetching more transactions.
-            </div>
-          )}
-
-          <div className="pt-2 border-t">
-            <p className="text-sm text-muted-foreground">
-              Net Flow Ratio: {(netFlowRatio * 100).toFixed(1)}%
-            </p>
-          </div>
         </div>
       </CardContent>
     </Card>

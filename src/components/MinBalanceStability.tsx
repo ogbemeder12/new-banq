@@ -29,49 +29,78 @@ const MinBalanceStability = ({ transactions, currentBalance = 0 }: MinBalanceSta
     }
 
     try {
-      // Sort transactions by timestamp
-      const sortedTransactions = [...transactions].sort((a, b) => a.timestamp - b.timestamp);
-      console.log(`Analyzing ${sortedTransactions.length} transactions for minimum balance stability`);
+      // Extract SOL transactions only
+      const solTransactions = transactions.filter(tx => 
+        !tx.currency || tx.currency.toUpperCase() === 'SOL'
+      );
+      
+      console.log(`Analyzing ${solTransactions.length} SOL transactions for minimum balance stability`);
 
-      // Calculate running balance and daily minimums
+      // Sort transactions by timestamp (oldest first)
+      const sortedTransactions = [...solTransactions].sort((a, b) => a.timestamp - b.timestamp);
+      
+      // Calculate historical balances
+      const historicalBalances: number[] = [];
       let runningBalance = currentBalance;
-      const dailyMinimums: { [key: string]: number } = {};
-      let currentDay = '';
-
-      // Process transactions in reverse (newest to oldest) to calculate historical balances
+      
+      // Work backwards from current balance to calculate historical balances
       for (let i = sortedTransactions.length - 1; i >= 0; i--) {
         const tx = sortedTransactions[i];
         const amount = typeof tx.amount === 'string' ? 
           parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
           (typeof tx.amount === 'number' ? tx.amount : 0);
-
+        
+        if (!isNaN(amount)) {
+          // Reverse the transaction to go backwards in time
+          runningBalance -= amount;
+          historicalBalances.push(runningBalance);
+          
+          console.log(`Historical balance after reverting transaction ${tx.signature?.substring(0, 6)}: ${runningBalance.toFixed(4)} SOL`);
+        }
+      }
+      
+      // Find the absolute minimum balance observed
+      const minBalance = Math.min(...historicalBalances, currentBalance);
+      console.log(`Minimum observed balance: ${minBalance.toFixed(4)} SOL`);
+      
+      // Calculate daily minimum balances
+      const dailyMinimums: Record<string, number> = {};
+      runningBalance = currentBalance;
+      
+      // Reset and calculate daily minimums going forward
+      for (let i = sortedTransactions.length - 1; i >= 0; i--) {
+        const tx = sortedTransactions[i];
+        const amount = typeof tx.amount === 'string' ? 
+          parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+          (typeof tx.amount === 'number' ? tx.amount : 0);
+          
         if (isNaN(amount)) continue;
-
+        
         // Get day from timestamp
         const day = new Date(tx.timestamp * 1000).toISOString().split('T')[0];
-
+        
         // Update running balance (subtract amount since we're going backwards)
         runningBalance -= amount;
-
+        
         // Update daily minimum
         if (!dailyMinimums[day] || runningBalance < dailyMinimums[day]) {
           dailyMinimums[day] = runningBalance;
         }
-
-        currentDay = day;
       }
-
-      // Calculate average minimum balance
+      
+      // Calculate average minimum daily balance
       const minBalances = Object.values(dailyMinimums);
       const averageMinBalance = minBalances.length > 0 
-        ? minBalances.reduce((sum, bal) => sum + bal, 0) / minBalances.length 
-        : 0;
+        ? minBalances.reduce((sum, bal) => sum + Math.max(0, bal), 0) / minBalances.length 
+        : Math.max(0, minBalance);
+        
+      console.log(`Average minimum daily balance: ${averageMinBalance.toFixed(4)} SOL from ${minBalances.length} days`);
 
       // Calculate ratio of average minimum balance to total wallet value
-      const totalValue = Math.max(currentBalance, ...minBalances);
-      const minBalanceRatio = totalValue > 0 ? (averageMinBalance / totalValue) : 0;
-
-      console.log(`Average min balance: ${averageMinBalance}, Total value: ${totalValue}, Ratio: ${minBalanceRatio}`);
+      const totalValue = Math.max(currentBalance, ...minBalances, 0.001); // Avoid division by zero
+      const minBalanceRatio = Math.max(0, averageMinBalance) / totalValue;
+      
+      console.log(`Min balance ratio: ${(minBalanceRatio * 100).toFixed(2)}% (${averageMinBalance.toFixed(4)} / ${totalValue.toFixed(4)})`);
 
       // Calculate score based on ratio thresholds
       let score = 0;
@@ -82,8 +111,10 @@ const MinBalanceStability = ({ transactions, currentBalance = 0 }: MinBalanceSta
       } else if (minBalanceRatio >= 0.1) {
         score = 40 + ((minBalanceRatio - 0.1) / 0.2) * 29; // Scale 40-69
       } else {
-        score = Math.max(0, (minBalanceRatio / 0.1) * 39); // Scale 0-39
+        score = Math.max(20, (minBalanceRatio / 0.1) * 39); // Scale 20-39
       }
+
+      console.log(`Final stability score: ${Math.round(score)}`);
 
       return {
         score: Math.round(score),

@@ -161,7 +161,7 @@ const WalletLookup = () => {
 
     try {
       setIsLoading(prev => ({ ...prev, transactions: true }));
-      const data = await fetchTransactionHistory(input, isTransactionSignature(input) ? 1 : 5);
+      const data = await fetchTransactionHistory(input, isTransactionSignature(input) ? 1 : 20);
       console.log("Fetched transactions:", data);
       setTransactions(data);
       setDataFetched(prev => ({ ...prev, transactions: true }));
@@ -431,7 +431,7 @@ const WalletLookup = () => {
                     Loading...
                   </>
                 ) : (
-                  "Refresh Transactions (5 transactions)"
+                  "Refresh Transactions (20 transactions)"
                 )}
               </Button>
             </CardFooter>

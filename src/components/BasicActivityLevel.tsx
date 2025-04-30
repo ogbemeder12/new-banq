@@ -7,6 +7,8 @@ type Transaction = {
   signature?: string;
   timestamp?: number;
   blockTime?: number;
+  amount?: string | number;
+  currency?: string;
 };
 
 type Props = {
@@ -21,7 +23,16 @@ function calculateActivityScore(transactions: Transaction[]) {
     };
   }
 
-  const totalTransactions = transactions.length;
+  // Filter out transactions without valid numerical amounts
+  const validTransactions = transactions.filter(tx => {
+    const amount = typeof tx.amount === 'string' ? 
+      parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+      (typeof tx.amount === 'number' ? tx.amount : 0);
+    
+    return !isNaN(amount) && amount !== 0;
+  });
+
+  const totalTransactions = validTransactions.length;
   let score = 0;
 
   // Calculate score based on transaction count
