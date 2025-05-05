@@ -17,6 +17,38 @@ interface NetFlowProps {
 
 const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
   console.log("NetFlowAnalysis received transactions:", transactions);
+  console.log("Current SOL to USDC rate:", solToUsdcRate);
+  
+  // Helper function to convert any transaction amount to SOL
+  const convertToSol = (tx: Transaction): number => {
+    try {
+      // Handle both string and number amount formats
+      const amount = typeof tx.amount === 'string' ? 
+        parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+        (typeof tx.amount === 'number' ? tx.amount : 0);
+      
+      if (isNaN(amount) || amount === 0) return 0;
+      
+      // Default all amounts to USDC if not specified, then convert to SOL
+      const currency = tx.currency?.toUpperCase() || 'USDC'; // Assume USDC by default if not specified
+      
+      // If it's already in SOL, return as is
+      if (currency === 'SOL') return amount;
+      
+      // Convert all amounts (USDC or any other) to SOL if we have a valid rate
+      if (solToUsdcRate > 0) {
+        const amountInSol = amount / solToUsdcRate;
+        console.log(`Converted ${amount} ${currency} to ${amountInSol} SOL (rate: ${solToUsdcRate})`);
+        return amountInSol;
+      }
+      
+      // Default case - return original amount (should be handled better in production)
+      return amount;
+    } catch (error) {
+      console.error("Error converting transaction amount:", error);
+      return 0;
+    }
+  };
   
   const calculateNetFlow = (transactions: Transaction[]) => {
     let totalInflow = 0;
@@ -36,23 +68,19 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
 
     transactions.forEach(tx => {
       try {
-        // Handle both string and number amount formats
-        const amount = typeof tx.amount === 'string' ? 
-          parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
-          (typeof tx.amount === 'number' ? tx.amount : 0);
+        // Convert the transaction amount to SOL
+        const amountInSol = convertToSol(tx);
         
-        console.log(`Processing tx: ${tx.signature?.slice(0, 6) || 'unknown'}... Amount: ${amount} ${tx.currency || 'unknown'}`);
-        
-        // Skip if amount is NaN or 0
-        if (isNaN(amount) || amount === 0) return;
+        // Skip if amount is 0
+        if (amountInSol === 0) return;
         
         // If amount is positive, it's an inflow, otherwise it's an outflow
-        if (amount > 0) {
-          totalInflow += amount;
-          console.log(`Added inflow: +${amount}, total inflow now: ${totalInflow}`);
-        } else if (amount < 0) {
-          totalOutflow += Math.abs(amount);
-          console.log(`Added outflow: ${amount}, total outflow now: ${totalOutflow}`);
+        if (amountInSol > 0) {
+          totalInflow += amountInSol;
+          console.log(`Added inflow: +${amountInSol}, total inflow now: ${totalInflow}`);
+        } else if (amountInSol < 0) {
+          totalOutflow += Math.abs(amountInSol);
+          console.log(`Added outflow: ${amountInSol}, total outflow now: ${totalOutflow}`);
         }
       } catch (error) {
         console.error("Error processing transaction in NetFlowAnalysis:", error);

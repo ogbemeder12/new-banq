@@ -377,7 +377,7 @@ function extractTransactionAmount(transaction: any, walletAddress: string): { am
  * @param limit - Number of transactions to fetch
  * @param beforeSignature - Optional signature to paginate before
  */
-export const fetchTransactionHistory = async (input: string, limit: number = 20, beforeSignature?: string) => {
+export const fetchTransactionHistory = async (input: string, limit: number = 50, beforeSignature?: string) => {
   let retries = 0;
   
   while (retries < MAX_RETRIES) {

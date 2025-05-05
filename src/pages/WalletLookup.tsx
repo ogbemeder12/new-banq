@@ -161,7 +161,7 @@ const WalletLookup = () => {
 
     try {
       setIsLoading(prev => ({ ...prev, transactions: true }));
-      const data = await fetchTransactionHistory(input, isTransactionSignature(input) ? 1 : 20);
+      const data = await fetchTransactionHistory(input, isTransactionSignature(input) ? 1 : 50);
       console.log("Fetched transactions:", data);
       setTransactions(data);
       setDataFetched(prev => ({ ...prev, transactions: true }));
@@ -244,6 +244,37 @@ const WalletLookup = () => {
 
   const truncateAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  // Helper function to format transaction amounts with USDC to SOL conversion
+  const formatTransactionAmount = (tx: any) => {
+    if (!tx.amount) return '-';
+    
+    let amount = typeof tx.amount === 'string' ? 
+      parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+      (typeof tx.amount === 'number' ? tx.amount : 0);
+    
+    if (isNaN(amount)) return '-';
+    
+    // Always treat amounts as USDC by default, unless explicitly marked as SOL
+    const currency = (tx.currency || 'USDC').toUpperCase(); 
+    
+    // Convert to SOL if we have a conversion rate
+    if (solToUsdcRate > 0) {
+      if (currency === 'USDC') {
+        const amountInSol = amount / solToUsdcRate;
+        return `${amountInSol.toFixed(4)} SOL (${amount.toFixed(2)} USDC)`;
+      } else if (currency === 'SOL') {
+        return `${amount.toFixed(4)} SOL`;
+      } else {
+        // For other currencies, try to convert through USDC rate as an approximation
+        const amountInSol = amount / solToUsdcRate;
+        return `${amountInSol.toFixed(4)} SOL (${amount.toFixed(2)} ${currency})`;
+      }
+    }
+    
+    // Default case - if no conversion rate available
+    return `${amount.toFixed(4)} ${currency}`;
   };
 
   return (
@@ -409,9 +440,7 @@ const WalletLookup = () => {
                           <TableCell>{formatDate(tx.timestamp || tx.blockTime)}</TableCell>
                           <TableCell>{tx.type || "Transfer"}</TableCell>
                           <TableCell>
-                            {tx.amount ? 
-                              `${parseFloat(tx.amount).toFixed(4)} ${tx.currency || 'SOL'}` : 
-                              '-'}
+                            {formatTransactionAmount(tx)}
                           </TableCell>
                           <TableCell>{tx.status || (tx.err ? "Failed" : "Success")}</TableCell>
                         </TableRow>
