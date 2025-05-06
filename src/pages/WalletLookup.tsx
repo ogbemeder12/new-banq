@@ -460,7 +460,7 @@ const WalletLookup = () => {
                     Loading...
                   </>
                 ) : (
-                  "Refresh Transactions (20 transactions)"
+                    "Refresh Transactions (50 transactions)"
                 )}
               </Button>
             </CardFooter>

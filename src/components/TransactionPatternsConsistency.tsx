@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Clock, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
 
@@ -8,6 +7,7 @@ type Transaction = {
   blockTime?: number;
   amount?: string | number;
   currency?: string;
+  fee?: number;
 };
 
 type Props = {
@@ -40,6 +40,46 @@ function computeWeeklyActivity(transactions: Transaction[]) {
   const avgPerWeek = recentTxs.length / weeks;
   
   return avgPerWeek;
+}
+
+function calculateSafetyBuffer(transactions: Transaction[]): number {
+  // Base fee per transaction in LAMPORTS (0.000005 SOL)
+  const baseFeePerTx = 5000;
+  
+  // Calculate the average transaction fee used in the wallet's history if available
+  let actualAvgFeePerTx = baseFeePerTx;
+  
+  // If we have transactions with fees, calculate the average
+  const txsWithFees = transactions.filter(tx => tx.fee || tx.fee === 0);
+  if (txsWithFees.length > 0) {
+    const totalFees = txsWithFees.reduce((sum, tx) => sum + (tx.fee || 0), 0);
+    actualAvgFeePerTx = Math.max(baseFeePerTx, Math.ceil(totalFees / txsWithFees.length));
+    console.log(`Calculated actual average fee from ${txsWithFees.length} transactions: ${actualAvgFeePerTx} lamports`);
+  }
+  
+  // Calculate safety margin based on transaction volume and fees
+  // Higher volume wallets need more buffer
+  const avgWeekly = computeWeeklyActivity(transactions);
+  
+  // Base safety margin in LAMPORTS (0.001 SOL)
+  let safetyMargin = 1000000; 
+  
+  // Scale safety margin with activity level
+  if (avgWeekly >= 20) {
+    safetyMargin = 2000000; // 0.002 SOL for very active wallets
+  } else if (avgWeekly >= 10) {
+    safetyMargin = 1500000; // 0.0015 SOL for moderately active wallets
+  }
+  
+  // Calculate buffer in LAMPORTS
+  const bufferInLamports = actualAvgFeePerTx + safetyMargin;
+  
+  // Convert to SOL (1 SOL = 1,000,000,000 LAMPORTS)
+  const bufferInSol = bufferInLamports / 1000000000;
+  
+  console.log(`Calculated safety buffer for this wallet: ${bufferInSol} SOL (${bufferInLamports} lamports)`);
+  
+  return bufferInSol;
 }
 
 function getMinBalance(transactions: Transaction[], currentBalance: number) {
@@ -106,27 +146,30 @@ function getMinBalance(transactions: Transaction[], currentBalance: number) {
 
 function getScore({
   avgWeeklyTx,
-  minSolBuffer
+  minSolBuffer,
+  calculatedBuffer
 }: {
   avgWeeklyTx: number;
   minSolBuffer: number;
+  calculatedBuffer: number;
 }): number {
   // Generate score based on weekly transaction volume and SOL buffer
-  if (avgWeeklyTx >= 15 && minSolBuffer >= 1) return 95;
-  if (avgWeeklyTx >= 10 && minSolBuffer >= 0.5) return 90;
-  if (avgWeeklyTx >= 10 && minSolBuffer >= 0.1) return 85;
-  if (avgWeeklyTx >= 7 && minSolBuffer >= 0.25) return 80;
-  if (avgWeeklyTx >= 5 && minSolBuffer >= 0.1) return 75;
-  if (avgWeeklyTx >= 5 && minSolBuffer >= 0.05) return 70;
-  if (avgWeeklyTx >= 3 && minSolBuffer >= 0.1) return 65;
+  // Use calculated buffer as reference
+  if (avgWeeklyTx >= 15 && minSolBuffer >= calculatedBuffer * 10) return 95;
+  if (avgWeeklyTx >= 10 && minSolBuffer >= calculatedBuffer * 5) return 90;
+  if (avgWeeklyTx >= 10 && minSolBuffer >= calculatedBuffer) return 85;
+  if (avgWeeklyTx >= 7 && minSolBuffer >= calculatedBuffer * 2.5) return 80;
+  if (avgWeeklyTx >= 5 && minSolBuffer >= calculatedBuffer) return 75;
+  if (avgWeeklyTx >= 5 && minSolBuffer >= calculatedBuffer * 0.5) return 70;
+  if (avgWeeklyTx >= 3 && minSolBuffer >= calculatedBuffer) return 65;
   if (avgWeeklyTx >= 3 && minSolBuffer >= 0) return 60;
-  if (avgWeeklyTx >= 1 && minSolBuffer >= 0.05) return 55;
+  if (avgWeeklyTx >= 1 && minSolBuffer >= calculatedBuffer * 0.5) return 55;
   if (avgWeeklyTx >= 1 && minSolBuffer >= 0) return 50;
   if (avgWeeklyTx > 0.5 && minSolBuffer >= 0) return 40;
   if (avgWeeklyTx > 0.1) return 30;
   
   // Very low activity
-  return Math.max(20, Math.round(avgWeeklyTx * 100) + Math.round(minSolBuffer * 20));
+  return Math.max(20, Math.round(avgWeeklyTx * 100) + Math.round(minSolBuffer / calculatedBuffer * 20));
 }
 
 const TransactionPatternsConsistency: React.FC<Props> = ({
@@ -134,6 +177,9 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
   currentBalance
 }) => {
   const avgWeeklyTx = computeWeeklyActivity(transactions);
+  
+  // Calculate the buffer based on this specific wallet's transaction history
+  const calculatedBuffer = calculateSafetyBuffer(transactions);
   
   // Only include SOL transactions in minimum balance calculation
   const solTransactions = transactions.filter(tx => 
@@ -144,13 +190,15 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
 
   const score = getScore({
     avgWeeklyTx,
-    minSolBuffer
+    minSolBuffer,
+    calculatedBuffer
   });
 
   console.log("TransactionPatternsConsistency Metrics:", { 
     avgWeeklyTx, 
     minSolBuffer,
     currentBalance,
+    calculatedBuffer,
     score,
     transactionsCount: transactions.length,
     solTransactionsCount: solTransactions.length
@@ -184,23 +232,42 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
         <div>
           <dt className="text-muted-foreground text-sm mb-1 flex items-center gap-1">
             <DollarSign className="inline-block h-4 w-4" />
-            Lowest SOL Fee Buffer
+            SOL Fee Safety Buffer
+          </dt>
+          <dd className="text-lg font-bold">
+            {calculatedBuffer.toFixed(6)} SOL
+            <span className="text-xs text-muted-foreground ml-2">
+              (Based on transaction history)
+            </span>
+          </dd>
+        </div>
+        <div className="md:col-span-2">
+          <dt className="text-muted-foreground text-sm mb-1 flex items-center gap-1">
+            <DollarSign className="inline-block h-4 w-4" />
+            Lowest Observed Balance
           </dt>
           <dd className="text-lg font-bold">
             {minSolBuffer.toFixed(4)} SOL
-            <span className="text-xs text-muted-foreground ml-2">
-              (min observed)
+            <span className={`text-xs ml-2 ${minSolBuffer >= calculatedBuffer * 5 ? "text-green-600" : minSolBuffer >= calculatedBuffer ? "text-green-600" : minSolBuffer >= calculatedBuffer * 0.5 ? "text-amber-600" : "text-red-600"}`}>
+              {minSolBuffer >= calculatedBuffer * 5 
+                ? "(Well above buffer - Excellent)" 
+                : minSolBuffer >= calculatedBuffer 
+                  ? "(Above buffer - Good)" 
+                  : minSolBuffer >= calculatedBuffer * 0.5 
+                    ? "(Below recommended buffer - Caution)" 
+                    : "(Well below buffer - Risk)"
+              }
             </span>
           </dd>
         </div>
       </dl>
       <div className="mt-2 text-sm text-muted-foreground">
-        {/* Scoring notes */}
+        <p className="mb-1">Buffer calculation: Average Fee ({(calculatedBuffer * 1000000000 - 1000000).toFixed(0)} lamports) + Safety Margin (1,000,000 lamports) = {calculatedBuffer.toFixed(6)} SOL</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>10 tx/week + always &gt; 0.1 SOL buffer: 90–100</li>
-          <li>5–10 tx/week, buffer maintained: 70–89</li>
-          <li>1–5 tx/week, sometimes dry: 40–69</li>
-          <li>Irregular use/dry spells: 0–39</li>
+          <li>10+ tx/week + balance &gt; 5x buffer: 90–100</li>
+          <li>5–10 tx/week, balance &gt; 1x buffer: 70–89</li>
+          <li>1–5 tx/week or balance &lt; buffer: 40–69</li>
+          <li>Irregular use/frequently below buffer: 0–39</li>
         </ul>
       </div>
     </div>

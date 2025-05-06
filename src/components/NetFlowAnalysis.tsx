@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -74,11 +73,14 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
         // Skip if amount is 0
         if (amountInSol === 0) return;
         
+        // Use the exact same logic for both inflow and outflow:
         // If amount is positive, it's an inflow, otherwise it's an outflow
         if (amountInSol > 0) {
+          // Apply the same logic for inflow as outflow (no changes here)
           totalInflow += amountInSol;
           console.log(`Added inflow: +${amountInSol}, total inflow now: ${totalInflow}`);
         } else if (amountInSol < 0) {
+          // Keep the outflow logic exactly as it is since it's working correctly
           totalOutflow += Math.abs(amountInSol);
           console.log(`Added outflow: ${amountInSol}, total outflow now: ${totalOutflow}`);
         }
@@ -171,6 +173,11 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
                   </div>
                   <p className="text-xl font-bold">
                     <strong>{totalInflow.toFixed(4)} SOL</strong>
+                    {solToUsdcRate > 0 && (
+                      <span className="block text-sm text-muted-foreground mt-1">
+                        ≈ {(totalInflow * solToUsdcRate).toFixed(2)} USDC
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -181,6 +188,11 @@ const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
                   </div>
                   <p className="text-xl font-bold">
                     <strong>{totalOutflow.toFixed(4)} SOL</strong>
+                    {solToUsdcRate > 0 && (
+                      <span className="block text-sm text-muted-foreground mt-1">
+                        ≈ {(totalOutflow * solToUsdcRate).toFixed(2)} USDC
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
