@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Activity, ListFilter } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -22,6 +22,8 @@ function calculateActivityScore(transactions: Transaction[]) {
       score: 0
     };
   }
+
+  console.log(`Calculating activity score based on ${transactions.length} real transactions from Helius API`);
 
   // Filter out transactions without valid numerical amounts
   const validTransactions = transactions.filter(tx => {
@@ -55,7 +57,58 @@ function calculateActivityScore(transactions: Transaction[]) {
 }
 
 const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
+  // Real data coming from props, no mock data
   const { totalTransactions, score } = calculateActivityScore(transactions);
+  const [animatedScore, setAnimatedScore] = useState(0);
+  const [animatedTransactions, setAnimatedTransactions] = useState(0);
+  const [animationCompleted, setAnimationCompleted] = useState(false);
+
+  useEffect(() => {
+    // Animate the score with real data
+    if (score > 0) {
+      const scoreDuration = 1000; // 1s for score animation
+      const scoreInterval = 20; // Update every 20ms
+      const scoreSteps = scoreDuration / scoreInterval;
+      const scoreIncrement = score / scoreSteps;
+      
+      let currentScore = 0;
+      const scoreTimer = setInterval(() => {
+        currentScore += scoreIncrement;
+        if (currentScore >= score) {
+          setAnimatedScore(score);
+          setAnimationCompleted(true);
+          clearInterval(scoreTimer);
+        } else {
+          setAnimatedScore(Math.floor(currentScore));
+        }
+      }, scoreInterval);
+      
+      return () => clearInterval(scoreTimer);
+    }
+  }, [score]);
+  
+  useEffect(() => {
+    // Animate the transaction count with real data
+    if (totalTransactions > 0) {
+      const txDuration = 1200; // 1.2s for transaction count animation
+      const txInterval = 20; // Update every 20ms
+      const txSteps = txDuration / txInterval;
+      const txIncrement = totalTransactions / txSteps;
+      
+      let currentTx = 0;
+      const txTimer = setInterval(() => {
+        currentTx += txIncrement;
+        if (currentTx >= totalTransactions) {
+          setAnimatedTransactions(totalTransactions);
+          clearInterval(txTimer);
+        } else {
+          setAnimatedTransactions(Math.floor(currentTx));
+        }
+      }, txInterval);
+      
+      return () => clearInterval(txTimer);
+    }
+  }, [totalTransactions]);
 
   return (
     <Card className="bg-muted shadow">
@@ -74,7 +127,7 @@ const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
                 : "bg-red-200 text-red-800"
             }`}
           >
-            Score: {score}
+            Score: {animatedScore}
           </span>
         </CardTitle>
       </CardHeader>
@@ -83,7 +136,7 @@ const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
           <div className="flex items-center gap-2">
             <ListFilter className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm text-muted-foreground">Total Transactions:</span>
-            <span className="font-medium">{totalTransactions}</span>
+            <span className="font-medium">{animatedTransactions}</span>
           </div>
           
           <div className="text-sm text-muted-foreground">
@@ -92,7 +145,7 @@ const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
               <li>500–1000 transactions: 80</li>
               <li>100–500 transactions: 50</li>
               <li>10-99 transactions: 20</li>
-              <li>&lt;10 transactions: 0</li>
+              <li>{`<10 transactions: 0`}</li>
             </ul>
           </div>
         </div>

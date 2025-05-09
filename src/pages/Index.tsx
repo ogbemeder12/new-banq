@@ -1,6 +1,6 @@
 
 import React from "react";
-import { PhoneVerification } from "@/components/PhoneVerification";
+import PhoneVerification from "@/components/PhoneVerification";
 import { useWallet } from "@/contexts/WalletContext";
 import { WalletCreated } from "@/components/WalletCreated";
 import { RecoveryPhrase } from "@/components/RecoveryPhrase";
@@ -50,4 +50,4 @@ export default function Index() {
       </footer>
     </div>
   );
-}    
+}

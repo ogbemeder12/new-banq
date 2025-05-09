@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Shield, ArrowUpCircle, PercentIcon } from "lucide-react";
@@ -140,6 +140,77 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
     };
   }, [transactions]);
 
+  const [animatedScore, setAnimatedScore] = useState(0);
+  const [animatedLTV, setAnimatedLTV] = useState(0);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+
+  useEffect(() => {
+    // Animate the score
+    if (score > 0) {
+      const duration = 1200;
+      const interval = 20;
+      const steps = duration / interval;
+      const increment = score / steps;
+      
+      let current = 0;
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= score) {
+          setAnimatedScore(score);
+          clearInterval(timer);
+        } else {
+          setAnimatedScore(Math.floor(current));
+        }
+      }, interval);
+      
+      return () => clearInterval(timer);
+    }
+  }, [score]);
+
+  useEffect(() => {
+    // Animate the LTV
+    if (avgLTV > 0) {
+      const duration = 1500;
+      const interval = 30;
+      const steps = duration / interval;
+      const increment = avgLTV / steps;
+      
+      let current = 0;
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= avgLTV) {
+          setAnimatedLTV(avgLTV);
+          clearInterval(timer);
+        } else {
+          setAnimatedLTV(current);
+        }
+      }, interval);
+      
+      return () => clearInterval(timer);
+    }
+  }, [avgLTV]);
+
+  useEffect(() => {
+    // Animate the progress bar
+    const duration = 1000;
+    const interval = 20;
+    const steps = duration / interval;
+    const increment = score / steps;
+    
+    let progress = 0;
+    const timer = setInterval(() => {
+      progress += increment;
+      if (progress >= score) {
+        setAnimatedProgress(score);
+        clearInterval(timer);
+      } else {
+        setAnimatedProgress(progress);
+      }
+    }, interval);
+    
+    return () => clearInterval(timer);
+  }, [score]);
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -154,9 +225,9 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
             <div className="flex flex-col space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Score</span>
-                <span className={`text-sm font-medium ${scoreColor}`}>{score}</span>
+                <span className={`text-sm font-medium ${scoreColor}`}>{animatedScore}</span>
               </div>
-              <Progress value={score} className="h-2" />
+              <Progress value={animatedProgress} className="h-2" />
               <span className="mt-1 text-xs text-center block font-medium text-muted-foreground">{scoreBand}</span>
             </div>
 
@@ -166,7 +237,7 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
                   <PercentIcon className="h-3.5 w-3.5" />
                   <span>Average LTV</span>
                 </div>
-                <span className="font-medium">{avgLTV.toFixed(1)}%</span>
+                <span className="font-medium">{animatedLTV.toFixed(1)}%</span>
               </div>
 
               <div className="flex items-center justify-between">

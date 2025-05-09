@@ -1,9 +1,10 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Keypair } from "@solana/web3.js";
 import * as bs58 from "bs58";
 import * as bip39 from "bip39";
 import { storeUserPhoneWallet, getWalletFromPhoneNumber, ensureMinimumBalance } from "@/services/programService";
+// Import PhoneInput
+import PhoneInput from "react-phone-number-input";
 
 // This polyfill is needed for bip39 to work in browser environments
 import { Buffer } from "buffer";
@@ -11,7 +12,7 @@ window.Buffer = window.Buffer || Buffer;
 
 type WalletContextType = {
   phoneNumber: string;
-  setPhoneNumber: (phone: string) => void;
+  setPhoneNumber: (phone: string | any) => void;
   isVerified: boolean;
   setIsVerified: (verified: boolean) => void;
   keypair: Keypair | null;
@@ -28,6 +29,7 @@ type WalletContextType = {
   createUserPDA: () => Promise<boolean>;
   linkingError: string;
   isLinkingWallet: boolean;
+  logout: () => void;
 };
 
 const WalletContext = createContext<WalletContextType | null>(null);
@@ -147,9 +149,23 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Add logout function
+  const logout = () => {
+    setPhoneNumber("");
+    setIsVerified(false);
+    setKeypair(null);
+    setMnemonic([]);
+    setVerificationCode("");
+    setStoredWalletAddress("");
+    setStep("phone");
+    setPdaCreated(false);
+    setLinkingError("");
+    setIsLinkingWallet(false);
+  };
+
   const value = {
     phoneNumber,
-    setPhoneNumber,
+    setPhoneNumber: (phone: string | any) => setPhoneNumber(phone?.toString() || ""),
     isVerified,
     setIsVerified,
     keypair,
@@ -166,6 +182,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     createUserPDA,
     linkingError,
     isLinkingWallet,
+    logout,
   };
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;

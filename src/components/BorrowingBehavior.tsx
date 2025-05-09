@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CreditCard, AlertCircle, Clock } from "lucide-react";
@@ -126,6 +126,77 @@ const BorrowingBehavior: React.FC<BorrowingBehaviorProps> = ({ transactions }) =
     };
   }, [transactions]);
 
+  const [animatedScore, setAnimatedScore] = useState(0);
+  const [animatedProgress, setAnimatedProgress] = useState(0);
+  const [animatedRepaymentRatio, setAnimatedRepaymentRatio] = useState(0);
+
+  useEffect(() => {
+    if (score > 0) {
+      // Animate the score number
+      let start = 0;
+      const duration = 1500;
+      const interval = 20;
+      const steps = duration / interval;
+      const increment = score / steps;
+      
+      const timer = setInterval(() => {
+        start += increment;
+        if (start >= score) {
+          setAnimatedScore(score);
+          clearInterval(timer);
+        } else {
+          setAnimatedScore(Math.floor(start));
+        }
+      }, interval);
+      
+      return () => clearInterval(timer);
+    }
+  }, [score]);
+
+  useEffect(() => {
+    // Animate the progress bar
+    const duration = 1000;
+    const interval = 20;
+    const steps = duration / interval;
+    const increment = score / steps;
+    
+    let progress = 0;
+    const timer = setInterval(() => {
+      progress += increment;
+      if (progress >= score) {
+        setAnimatedProgress(score);
+        clearInterval(timer);
+      } else {
+        setAnimatedProgress(progress);
+      }
+    }, interval);
+    
+    return () => clearInterval(timer);
+  }, [score]);
+
+  useEffect(() => {
+    // Animate the repayment ratio
+    if (repaymentRatio > 0) {
+      let start = 0;
+      const duration = 1200;
+      const interval = 30;
+      const steps = duration / interval;
+      const increment = repaymentRatio / steps;
+      
+      const timer = setInterval(() => {
+        start += increment;
+        if (start >= repaymentRatio) {
+          setAnimatedRepaymentRatio(repaymentRatio);
+          clearInterval(timer);
+        } else {
+          setAnimatedRepaymentRatio(start);
+        }
+      }, interval);
+      
+      return () => clearInterval(timer);
+    }
+  }, [repaymentRatio]);
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -140,9 +211,9 @@ const BorrowingBehavior: React.FC<BorrowingBehaviorProps> = ({ transactions }) =
             <div className="flex flex-col space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Score</span>
-                <span className={`text-sm font-medium ${scoreColor}`}>{score}</span>
+                <span className={`text-sm font-medium ${scoreColor}`}>{animatedScore}</span>
               </div>
-              <Progress value={score} className="h-2" />
+              <Progress value={animatedProgress} className="h-2" />
               <span className="mt-1 text-xs text-center block font-medium text-muted-foreground">{scoreBand}</span>
             </div>
 
@@ -152,7 +223,7 @@ const BorrowingBehavior: React.FC<BorrowingBehaviorProps> = ({ transactions }) =
                   <Clock className="h-3.5 w-3.5" />
                   <span>Loan Repayment Rate</span>
                 </div>
-                <span className="font-medium">{repaymentRatio.toFixed(0)}%</span>
+                <span className="font-medium">{animatedRepaymentRatio.toFixed(0)}%</span>
               </div>
               
               <div className="flex items-center justify-between">

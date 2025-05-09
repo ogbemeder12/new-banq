@@ -146,30 +146,19 @@ function getMinBalance(transactions: Transaction[], currentBalance: number) {
 
 function getScore({
   avgWeeklyTx,
-  minSolBuffer,
-  calculatedBuffer
+  minSolBuffer
 }: {
   avgWeeklyTx: number;
   minSolBuffer: number;
   calculatedBuffer: number;
 }): number {
-  // Generate score based on weekly transaction volume and SOL buffer
-  // Use calculated buffer as reference
-  if (avgWeeklyTx >= 15 && minSolBuffer >= calculatedBuffer * 10) return 95;
-  if (avgWeeklyTx >= 10 && minSolBuffer >= calculatedBuffer * 5) return 90;
-  if (avgWeeklyTx >= 10 && minSolBuffer >= calculatedBuffer) return 85;
-  if (avgWeeklyTx >= 7 && minSolBuffer >= calculatedBuffer * 2.5) return 80;
-  if (avgWeeklyTx >= 5 && minSolBuffer >= calculatedBuffer) return 75;
-  if (avgWeeklyTx >= 5 && minSolBuffer >= calculatedBuffer * 0.5) return 70;
-  if (avgWeeklyTx >= 3 && minSolBuffer >= calculatedBuffer) return 65;
-  if (avgWeeklyTx >= 3 && minSolBuffer >= 0) return 60;
-  if (avgWeeklyTx >= 1 && minSolBuffer >= calculatedBuffer * 0.5) return 55;
-  if (avgWeeklyTx >= 1 && minSolBuffer >= 0) return 50;
-  if (avgWeeklyTx > 0.5 && minSolBuffer >= 0) return 40;
-  if (avgWeeklyTx > 0.1) return 30;
+  // New scoring system based on the transaction count and SOL buffer
+  if (avgWeeklyTx >= 10 && minSolBuffer > 0.1) return Math.floor(Math.random() * 11) + 90; // 90-100
+  if (avgWeeklyTx >= 5 && avgWeeklyTx < 10 && minSolBuffer > 0) return Math.floor(Math.random() * 20) + 70; // 70-89
+  if (avgWeeklyTx >= 1 && avgWeeklyTx < 5) return Math.floor(Math.random() * 30) + 40; // 40-69
   
-  // Very low activity
-  return Math.max(20, Math.round(avgWeeklyTx * 100) + Math.round(minSolBuffer / calculatedBuffer * 20));
+  // Very irregular use or SOL dry spells
+  return Math.floor(Math.random() * 40); // 0-39
 }
 
 const TransactionPatternsConsistency: React.FC<Props> = ({
@@ -248,14 +237,12 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
           </dt>
           <dd className="text-lg font-bold">
             {minSolBuffer.toFixed(4)} SOL
-            <span className={`text-xs ml-2 ${minSolBuffer >= calculatedBuffer * 5 ? "text-green-600" : minSolBuffer >= calculatedBuffer ? "text-green-600" : minSolBuffer >= calculatedBuffer * 0.5 ? "text-amber-600" : "text-red-600"}`}>
-              {minSolBuffer >= calculatedBuffer * 5 
-                ? "(Well above buffer - Excellent)" 
-                : minSolBuffer >= calculatedBuffer 
-                  ? "(Above buffer - Good)" 
-                  : minSolBuffer >= calculatedBuffer * 0.5 
-                    ? "(Below recommended buffer - Caution)" 
-                    : "(Well below buffer - Risk)"
+            <span className={`text-xs ml-2 ${minSolBuffer > 0.1 ? "text-green-600" : minSolBuffer > 0 ? "text-amber-600" : "text-red-600"}`}>
+              {minSolBuffer > 0.1 
+                ? "(Healthy buffer - Excellent)" 
+                : minSolBuffer > 0 
+                  ? "(Minimal buffer - Caution)" 
+                  : "(Negative balance detected - Risk)"
               }
             </span>
           </dd>
@@ -264,10 +251,10 @@ const TransactionPatternsConsistency: React.FC<Props> = ({
       <div className="mt-2 text-sm text-muted-foreground">
         <p className="mb-1">Buffer calculation: Average Fee ({(calculatedBuffer * 1000000000 - 1000000).toFixed(0)} lamports) + Safety Margin (1,000,000 lamports) = {calculatedBuffer.toFixed(6)} SOL</p>
         <ul className="list-disc pl-5 space-y-1">
-          <li>10+ tx/week + balance &gt; 5x buffer: 90–100</li>
-          <li>5–10 tx/week, balance &gt; 1x buffer: 70–89</li>
-          <li>1–5 tx/week or balance &lt; buffer: 40–69</li>
-          <li>Irregular use/frequently below buffer: 0–39</li>
+          <li>10+ tx/week, SOL fee buffer always {'>'} 0.1 SOL: 90–100</li>
+          <li>5–10 tx/week, buffer maintained: 70–89</li>
+          <li>1–5 tx/week, sometimes out of gas: 40–69</li>
+          <li>Very irregular use or SOL dry spells: 0–39</li>
         </ul>
       </div>
     </div>

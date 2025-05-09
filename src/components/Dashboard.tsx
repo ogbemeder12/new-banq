@@ -3,12 +3,12 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWallet } from "@/contexts/WalletContext";
-import { Copy, ExternalLink, RefreshCw, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Copy, ExternalLink, RefreshCw, CheckCircle2, XCircle, Loader2, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardActions } from "@/components/DashboardActions";
 
 export function Dashboard() {
-  const { keypair, phoneNumber, step, pdaCreated, createUserPDA } = useWallet();
+  const { keypair, phoneNumber, step, pdaCreated, createUserPDA, logout } = useWallet();
   const { toast } = useToast();
   const [retryLoading, setRetryLoading] = useState(false);
 
@@ -66,19 +66,38 @@ export function Dashboard() {
     }
   };
 
+  const handleLogout = () => {
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out"
+    });
+    logout();
+  };
+
   return (
     <div className="w-full max-w-md mx-auto space-y-4">
       <Card className="bg-card text-card-foreground border-border shadow-lg overflow-hidden">
         <div className="h-3 solana-button-gradient w-full"></div>
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold tracking-tight flex justify-between items-center">
-            <span className="solana-gradient">Solana Wallet</span>
-            <span className="text-sm bg-secondary/10 text-secondary px-2 py-1 rounded-full">Devnet</span>
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-2xl font-bold tracking-tight">
+              <span className="solana-gradient">Solana Wallet</span>
+            </CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-1"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-3 w-3" />
+              Logout
+            </Button>
+          </div>
           <CardDescription>
             Connected to {phoneNumber}
           </CardDescription>
         </CardHeader>
+        
         <CardContent className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
