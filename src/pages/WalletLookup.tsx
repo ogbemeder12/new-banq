@@ -22,6 +22,7 @@ import ShareCreditScore from '@/components/ShareCreditScore';
 import ImprovementPlan from "@/components/ImprovementPlan";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Link } from 'react-router-dom';
 
 // Interface for our calculated metrics
 interface ScoreMetric {
@@ -35,8 +36,8 @@ interface ScoreMetric {
 const calculatePaymentHistory = (transactions: any[]): ScoreMetric => {
   if (!transactions || transactions.length === 0) {
     return {
-      title: "Payment History",
-      description: "Your history of on-time payments",
+      title: "Minimum Balance Stability",
+      description: "How well you maintain reserves in your wallet",
       score: "No Data",
       percentage: 0
     };
@@ -52,25 +53,25 @@ const calculatePaymentHistory = (transactions: any[]): ScoreMetric => {
   let percentage = 0;
   
   if (successRate >= 98) {
-    score = "Excellent";
+    score = "95";
     percentage = 95;
   } else if (successRate >= 95) {
-    score = "Good";
+    score = "80";
     percentage = 80;
   } else if (successRate >= 90) {
-    score = "Fair";
+    score = "60";
     percentage = 60;
   } else if (successRate >= 80) {
-    score = "Poor";
+    score = "40";
     percentage = 40;
   } else {
-    score = "Very Poor";
+    score = "20";
     percentage = 20;
   }
   
   return {
-    title: "Payment History",
-    description: "Your history of on-time payments",
+    title: "Minimum Balance Stability",
+    description: "How well you maintain reserves in your wallet",
     score,
     percentage
   };
@@ -80,8 +81,8 @@ const calculatePaymentHistory = (transactions: any[]): ScoreMetric => {
 const calculateCreditUtilization = (transactions: any[], balance: number): ScoreMetric => {
   if (!transactions || transactions.length === 0) {
     return {
-      title: "Credit Utilization",
-      description: "Amount of available credit you're using",
+      title: "Net Flow Analysis",
+      description: "Balance between inflows and outflows",
       score: "No Data",
       percentage: 0
     };
@@ -111,29 +112,29 @@ const calculateCreditUtilization = (transactions: any[], balance: number): Score
   
   // Determine score based on utilization
   // Lower utilization is better (user isn't spending all their funds)
-  let score = "Fair";
+  let score = "50";
   let percentage = 50;
   
   if (utilization < 30) {
-    score = "Excellent";
+    score = "95";
     percentage = 95;
   } else if (utilization < 50) {
-    score = "Good";
+    score = "75";
     percentage = 75;
   } else if (utilization < 70) {
-    score = "Fair";
+    score = "50";
     percentage = 50;
   } else if (utilization < 90) {
-    score = "Poor";
+    score = "30";
     percentage = 30;
   } else {
-    score = "Very Poor";
+    score = "10";
     percentage = 10;
   }
   
   return {
-    title: "Credit Utilization",
-    description: "Amount of available credit you're using",
+    title: "Net Flow Analysis",
+    description: "Balance between inflows and outflows",
     score,
     percentage
   };
@@ -143,8 +144,8 @@ const calculateCreditUtilization = (transactions: any[], balance: number): Score
 const calculateAccountAge = (transactions: any[]): ScoreMetric => {
   if (!transactions || transactions.length === 0) {
     return {
-      title: "Account Age",
-      description: "Length of credit history",
+      title: "Wallet Age & Longevity",
+      description: "How long your wallet has been active",
       score: "No Data",
       percentage: 0
     };
@@ -164,34 +165,34 @@ const calculateAccountAge = (transactions: any[]): ScoreMetric => {
   const ageInDays = (currentTimestamp - oldestTimestamp) / (60 * 60 * 24);
   
   // Determine score based on age
-  let score = "Poor";
+  let score = "20";
   let percentage = 20;
   
   if (ageInDays >= 365) {
     // Over 1 year
-    score = "Excellent";
+    score = "90";
     percentage = 90;
   } else if (ageInDays >= 180) {
     // 6 months to 1 year
-    score = "Good";
+    score = "70";
     percentage = 70;
   } else if (ageInDays >= 90) {
     // 3-6 months
-    score = "Fair";
+    score = "50";
     percentage = 50;
   } else if (ageInDays >= 30) {
     // 1-3 months
-    score = "Poor";
+    score = "30";
     percentage = 30;
   } else {
     // Less than 1 month
-    score = "Very Poor";
+    score = "10";
     percentage = 10;
   }
   
   return {
-    title: "Account Age",
-    description: "Length of credit history",
+    title: "Wallet Age & Longevity",
+    description: "How long your wallet has been active",
     score,
     percentage
   };
@@ -201,8 +202,8 @@ const calculateAccountAge = (transactions: any[]): ScoreMetric => {
 const calculateRecentInquiries = (transactions: any[]): ScoreMetric => {
   if (!transactions || transactions.length === 0) {
     return {
-      title: "Recent Inquiries",
-      description: "Number of recent credit applications",
+      title: "Transaction Patterns",
+      description: "Consistency of transaction activity",
       score: "No Data",
       percentage: 0
     };
@@ -233,29 +234,29 @@ const calculateRecentInquiries = (transactions: any[]): ScoreMetric => {
   
   // Determine score based on unique interactions
   // Fewer unique interactions is better for credit scoring
-  let score = "Good";
+  let score = "75";
   let percentage = 75;
   
   if (uniqueInteractions <= 3) {
-    score = "Excellent";
+    score = "95";
     percentage = 95;
   } else if (uniqueInteractions <= 10) {
-    score = "Good";
+    score = "75";
     percentage = 75;
   } else if (uniqueInteractions <= 20) {
-    score = "Fair";
+    score = "50";
     percentage = 50;
   } else if (uniqueInteractions <= 30) {
-    score = "Poor";
+    score = "30";
     percentage = 30;
   } else {
-    score = "Very Poor";
+    score = "10";
     percentage = 10;
   }
   
   return {
-    title: "Recent Inquiries",
-    description: "Number of recent credit applications",
+    title: "Transaction Patterns",
+    description: "Consistency of transaction activity",
     score,
     percentage
   };
@@ -265,8 +266,8 @@ const calculateRecentInquiries = (transactions: any[]): ScoreMetric => {
 const calculateCreditMix = (transactions: any[]): ScoreMetric => {
   if (!transactions || transactions.length === 0) {
     return {
-      title: "Credit Mix",
-      description: "Variety of credit accounts",
+      title: "Token Portfolio Health",
+      description: "Diversity of assets in portfolio",
       score: "No Data",
       percentage: 0
     };
@@ -293,29 +294,217 @@ const calculateCreditMix = (transactions: any[]): ScoreMetric => {
   const diversityScore = tokenDiversity + txTypeDiversity;
   
   // Determine score based on diversity
-  let score = "Fair";
+  let score = "50";
   let percentage = 50;
   
   if (diversityScore >= 8) {
-    score = "Excellent";
+    score = "90";
     percentage = 90;
   } else if (diversityScore >= 5) {
-    score = "Good";
+    score = "75";
     percentage = 75;
   } else if (diversityScore >= 3) {
-    score = "Fair";
+    score = "50";
     percentage = 50;
   } else if (diversityScore >= 2) {
-    score = "Poor";
+    score = "30";
     percentage = 30;
   } else {
-    score = "Very Poor";
+    score = "10";
     percentage = 10;
   }
   
   return {
-    title: "Credit Mix",
-    description: "Variety of credit accounts",
+    title: "Token Portfolio Health",
+    description: "Diversity of assets in portfolio",
+    score,
+    percentage
+  };
+};
+
+// Function to calculate strategic tool usage score
+const calculateStrategicToolUsage = (transactions: any[]): ScoreMetric => {
+  if (!transactions || transactions.length === 0) {
+    return {
+      title: "Strategic Usage of Tools",
+      description: "How efficiently you use DeFi tools",
+      score: "No Data",
+      percentage: 0
+    };
+  }
+  
+  // Count different tool usages from transactions
+  let jupiterSwaps = 0;
+  let limitOrders = 0;
+  let dcaCount = 0;
+  let multisigUse = 0;
+  let portfolioTools = 0;
+  
+  // Known program IDs for various tools
+  const jupiterProgramIds = [
+    "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4",
+    "JUP4Fb2cqiRUcaTHdrPC8h2gNsA2ETXiPDD33WcGuJB"
+  ];
+  
+  // Analyze each transaction for smart tool usage
+  transactions.forEach(tx => {
+    const description = (tx.description || '').toLowerCase();
+    const source = (tx.source || '').toLowerCase();
+    const programId = tx.programId || '';
+    
+    // Jupiter aggregator detection
+    if (jupiterProgramIds.includes(programId) || 
+        source.includes('jupiter') || 
+        description.includes('jupiter')) {
+      jupiterSwaps++;
+    }
+
+    // Limit orders detection
+    if (description.includes('limit order') || 
+        source.includes('serum') || 
+        source.includes('openbook')) {
+      limitOrders++;
+    }
+
+    // DCA tool usage
+    if (description.includes('dca') || 
+        description.includes('dollar cost')) {
+      dcaCount++;
+    }
+
+    // Multisig detection
+    if (source.includes('multisig') || 
+        source.includes('squads')) {
+      multisigUse++;
+    }
+
+    // Portfolio management tools
+    if (source.includes('birdeye') || 
+        source.includes('step.finance')) {
+      portfolioTools++;
+    }
+  });
+
+  // Calculate a score based on tool usage
+  const totalTools = jupiterSwaps + limitOrders + dcaCount + multisigUse + portfolioTools;
+  const totalTransactions = Math.max(1, transactions.length);
+  const toolUtilizationRate = totalTools / totalTransactions;
+  
+  let score = "20";
+  let percentage = 20;
+  
+  if (toolUtilizationRate >= 0.5) {
+    score = "90";
+    percentage = 90;
+  } else if (toolUtilizationRate >= 0.3) {
+    score = "70";
+    percentage = 70;
+  } else if (toolUtilizationRate >= 0.1) {
+    score = "50";
+    percentage = 50;
+  } else if (toolUtilizationRate > 0) {
+    score = "30";
+    percentage = 30;
+  }
+  
+  return {
+    title: "Strategic Usage of Tools",
+    description: "How efficiently you use DeFi tools",
+    score,
+    percentage
+  };
+};
+
+// Function to calculate basic activity level
+const calculateBasicActivityLevel = (transactions: any[]): ScoreMetric => {
+  if (!transactions || transactions.length === 0) {
+    return {
+      title: "Basic Activity Level",
+      description: "Volume and frequency of transactions",
+      score: "No Data",
+      percentage: 0
+    };
+  }
+  
+  const totalTransactions = transactions.length;
+  let score = "0";
+  let percentage = 0;
+  
+  if (totalTransactions >= 1000) {
+    score = "100";
+    percentage = 100;
+  } else if (totalTransactions >= 500) {
+    score = "80";
+    percentage = 80;
+  } else if (totalTransactions >= 100) {
+    score = "50";
+    percentage = 50;
+  } else if (totalTransactions >= 10) {
+    score = "20";
+    percentage = 20;
+  }
+  
+  return {
+    title: "Basic Activity Level",
+    description: "Volume and frequency of transactions",
+    score,
+    percentage
+  };
+};
+
+// Function to calculate retention behavior
+const calculateRetentionBehavior = (transactions: any[]): ScoreMetric => {
+  if (!transactions || transactions.length === 0) {
+    return {
+      title: "Retention Behavior",
+      description: "How well you hold assets over time",
+      score: "No Data",
+      percentage: 0
+    };
+  }
+  
+  // Analyze inflows vs. outflows to determine retention
+  let totalInflow = 0;
+  let totalOutflow = 0;
+  
+  transactions.forEach(tx => {
+    const amount = typeof tx.amount === 'string' ? 
+      parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+      (typeof tx.amount === 'number' ? tx.amount : 0);
+      
+    if (!isNaN(amount)) {
+      if (amount < 0) {
+        totalOutflow += Math.abs(amount);
+      } else if (amount > 0) {
+        totalInflow += amount;
+      }
+    }
+  });
+  
+  // Calculate retention ratio (higher is better)
+  const retentionRatio = totalInflow > 0 ? 
+    (totalInflow - totalOutflow) / totalInflow : 0;
+  
+  let score = "30";
+  let percentage = 30;
+  
+  if (retentionRatio >= 0.7) {
+    score = "90";
+    percentage = 90;
+  } else if (retentionRatio >= 0.5) {
+    score = "70";
+    percentage = 70;
+  } else if (retentionRatio >= 0.2) {
+    score = "50";
+    percentage = 50;
+  } else if (retentionRatio > 0) {
+    score = "40";
+    percentage = 40;
+  }
+  
+  return {
+    title: "Retention Behavior",
+    description: "How well you hold assets over time",
     score,
     percentage
   };
@@ -398,6 +587,9 @@ const WalletLookup = () => {
       const accountAge = calculateAccountAge(transactions);
       const recentInquiries = calculateRecentInquiries(transactions);
       const creditMix = calculateCreditMix(transactions);
+      const strategicToolUsage = calculateStrategicToolUsage(transactions);
+      const basicActivityLevel = calculateBasicActivityLevel(transactions);
+      const retentionBehavior = calculateRetentionBehavior(transactions);
       
       // Update the score insights
       setScoreInsights([
@@ -405,7 +597,10 @@ const WalletLookup = () => {
         creditUtilization,
         accountAge,
         recentInquiries,
-        creditMix
+        creditMix,
+        strategicToolUsage,
+        basicActivityLevel,
+        retentionBehavior
       ]);
     }
   }, [transactions, balance]);
@@ -786,7 +981,7 @@ const WalletLookup = () => {
           <Card className="w-full max-w-md bg-[#1a1130] border-purple-900/50">
             <CardContent className="pt-6">
               <div className="text-center mb-4">
-                <h2 className="text-2xl font-bold text-purple-300 mb-1">Connect Your Wallet</h2>
+                <h2 className="text-2xl font-bold text-purple-300">Connect Your Wallet</h2>
                 <p className="text-sm text-gray-400">Enter your Solana wallet to see your credit score</p>
               </div>
 
@@ -1036,21 +1231,7 @@ const WalletLookup = () => {
                 )}
               </CardContent>
             </Card>
-            
-            {transactions && transactions.length > 0 && (
-              <div className="grid gap-4 mt-6 md:grid-cols-2 lg:grid-cols-3">
-                <BasicActivityLevel 
-                  transactions={transactions}
-                />
-                <NetFlowAnalysis 
-                  transactions={transactions} 
-                  solToUsdcRate={solToUsdcRate} 
-                />
-                <RetentionBehavior 
-                  transactions={transactions} 
-                />
-              </div>
-            )}
+
           </TabsContent>
 
           <TabsContent value="insights" className="mt-0">
@@ -1098,33 +1279,7 @@ const WalletLookup = () => {
                 )}
               </CardContent>
             </Card>
-            
-            {transactions && transactions.length > 0 && (
-              <>
-                <div className="grid gap-4 mt-6 md:grid-cols-2">
-                  <MinBalanceStability
-                    transactions={transactions}
-                    currentBalance={balance?.amount || 0}
-                  />
-                  <BorrowingBehavior
-                    transactions={transactions}
-                  />
-                </div>
-                
-                <div className="mt-4">
-                  <TransactionPatternsConsistency
-                    transactions={transactions}
-                    currentBalance={balance?.amount || 0}
-                  />
-                </div>
-                
-                <div className="mt-4">
-                  <WalletAgeLongevity
-                    transactions={transactions}
-                  />
-                </div>
-              </>
-            )}
+
           </TabsContent>
 
           <TabsContent value="improve" className="mt-0">
@@ -1159,10 +1314,13 @@ const WalletLookup = () => {
                     icon="lock"
                     color="amber"
                   />
+                  <Link className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-2 rounded-full flex items-center justify-center" to="/signup">
+                    <button className="text-center">create profile</button>
+                  </Link>
 
                   {/* Additional cards for strategic tool usage and collateral management */}
-                  <div className="grid gap-4 mt-6">
-                    <CollateralManagement 
+                  {/* <div className="grid gap-4 mt-6">
+                    <CollateralManagement
                       transactions={transactions}
                     />
                     <TokenPortfolioHealth
@@ -1171,11 +1329,14 @@ const WalletLookup = () => {
                     <StrategicToolUsage
                       transactions={transactions}
                     />
-                  </div>
+                  </div> */}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+
+
+
 
           <TabsContent value="transactions" className="hidden">
             <Card className="bg-[#1a1130] border-0 shadow-lg">
@@ -1320,8 +1481,9 @@ const WalletLookup = () => {
                     "Refresh Staking Activities"
                   )}
                 </Button>
+
               </CardContent>
-            </Card>
+            </Card> 
           </TabsContent>
         </Tabs>
       </div>
@@ -1337,7 +1499,7 @@ const WalletLookup = () => {
   );
 };
 
-// Helper component for score insights, now using real data
+// Helper component for score insights, now using real data and numerical scores
 const ScoreInsightItem = ({ title, description, score, percentage }: { 
   title: string; 
   description: string; 
@@ -1355,23 +1517,19 @@ const ScoreInsightItem = ({ title, description, score, percentage }: {
   }, [percentage]);
   
   const getScoreColor = (scoreValue: string) => {
-    switch (scoreValue) {
-      case "Excellent": return "text-green-400";
-      case "Good": return "text-blue-400";
-      case "Fair": return "text-yellow-400";
-      case "Poor": return "text-red-400";
-      default: return "text-gray-400";
-    }
+    const numericScore = parseInt(scoreValue) || 0;
+    if (numericScore >= 90) return "text-green-400";
+    if (numericScore >= 70) return "text-blue-400";
+    if (numericScore >= 40) return "text-yellow-400";
+    return "text-red-400";
   };
 
   const getProgressColor = (scoreValue: string) => {
-    switch (scoreValue) {
-      case "Excellent": return "bg-green-500";
-      case "Good": return "bg-blue-500";
-      case "Fair": return "bg-yellow-500";
-      case "Poor": return "bg-red-500";
-      default: return "bg-gray-500";
-    }
+    const numericScore = parseInt(scoreValue) || 0;
+    if (numericScore >= 90) return "bg-green-500";
+    if (numericScore >= 70) return "bg-blue-500";
+    if (numericScore >= 40) return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   return (

@@ -21,7 +21,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<WalletLookup />} />
+            <Route path="/" element={<Navigate to="/wallet-lookup" replace />} />
             {/* <Route path="/" element={<Navigate to="/signin" replace />} /> */}
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />

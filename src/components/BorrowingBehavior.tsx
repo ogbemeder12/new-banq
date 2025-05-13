@@ -1,255 +1,243 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { CreditCard, AlertCircle, Clock } from "lucide-react";
+import React from "react";
+import { PiggyBank, Landmark, DollarSign } from "lucide-react";
 
-interface BorrowingBehaviorProps {
-  transactions: any[];
-}
+type Transaction = {
+  signature?: string;
+  timestamp?: number;
+  blockTime?: number;
+  amount?: number | string;
+  source?: string;
+  destination?: string;
+  description?: string;
+  type?: string;
+};
 
-const BorrowingBehavior: React.FC<BorrowingBehaviorProps> = ({ transactions }) => {
-  const {
-    score,
-    repaymentRatio,
-    liquidationCount,
-    creditUsageFrequency,
-    scoreBand,
-    scoreColor
-  } = useMemo(() => {
+type Props = {
+  transactions: Transaction[];
+};
+
+const BorrowingBehavior: React.FC<Props> = ({ transactions }) => {
+  // Calculate metrics based on transactions
+  const calculateMetrics = () => {
     if (!transactions || transactions.length === 0) {
-      return {
-        score: 0,
-        repaymentRatio: 0,
-        liquidationCount: 0,
-        creditUsageFrequency: 0,
-        scoreBand: 'No Data',
-        scoreColor: 'text-gray-400'
+      return { 
+        hasBorrowActivity: false, 
+        loanCount: 0,
+        repaymentCount: 0,
+        borrowedAmount: 0,
+        repaidAmount: 0,
+        loanToValueRatio: 0,
+        score: 40
       };
     }
-
-    console.log('Analyzing DeFi lending behavior from transactions:', transactions.length);
-
-    // Enhanced DeFi lending transaction detection using Helius API data
-    const lendingTransactions = transactions.filter(tx => {
-      // Look for specific DeFi lending indicators from Helius API
-      const isDeFiLendingTx = 
-        tx.type === 'BORROW' || 
-        tx.type === 'REPAY' || 
-        tx.type === 'LIQUIDATE' ||
-        (tx.description && (
-          tx.description.toLowerCase().includes('borrow') ||
-          tx.description.toLowerCase().includes('repay') ||
-          tx.description.toLowerCase().includes('liquidat') ||
-          tx.description.toLowerCase().includes('lending') ||
-          tx.description.toLowerCase().includes('loan')
-        )) ||
-        (tx.source && [
-          'SOLEND', 
-          'PORT', 
-          'LARIX', 
-          'MANGO', 
-          'FRANCIUM'
-        ].some(platform => tx.source.toUpperCase().includes(platform)));
+    
+    // Look for transactions that appear to be loan-related
+    // This is simplified - in reality would need more sophisticated pattern matching
+    const loanTransactions = transactions.filter(tx => {
+      const description = (tx.description || '').toLowerCase();
+      const type = (tx.type || '').toLowerCase();
       
-      return isDeFiLendingTx;
+      return description.includes('borrow') || 
+             description.includes('loan') ||
+             description.includes('lend') ||
+             description.includes('repay') ||
+             type.includes('borrow') ||
+             type.includes('loan') ||
+             type.includes('repay');
     });
-
-    console.log(`Found ${lendingTransactions.length} DeFi lending transactions`);
-
-    // Extract specific transaction types
-    const borrowTransactions = lendingTransactions.filter(tx => 
-      tx.type === 'BORROW' || 
-      tx.description?.toLowerCase().includes('borrow')
-    );
     
-    const repayTransactions = lendingTransactions.filter(tx => 
-      tx.type === 'REPAY' || 
-      tx.description?.toLowerCase().includes('repay')
-    );
+    // Count borrows vs repayments
+    const borrowTxs = loanTransactions.filter(tx => {
+      const description = (tx.description || '').toLowerCase();
+      const type = (tx.type || '').toLowerCase();
+      
+      return description.includes('borrow') || 
+             description.includes('loan') ||
+             type.includes('borrow');
+    });
     
-    const liquidationTransactions = lendingTransactions.filter(tx => 
-      tx.type === 'LIQUIDATE' || 
-      tx.description?.toLowerCase().includes('liquidat')
-    );
-
-    const totalBorrows = borrowTransactions.length;
-    const totalRepayments = repayTransactions.length;
-    const totalLiquidations = liquidationTransactions.length;
+    const repayTxs = loanTransactions.filter(tx => {
+      const description = (tx.description || '').toLowerCase();
+      const type = (tx.type || '').toLowerCase();
+      
+      return description.includes('repay') || 
+             type.includes('repay');
+    });
     
-    // Calculate metrics
-    const repaymentRatio = totalBorrows > 0 ? totalRepayments / totalBorrows : 1;
-    const liquidationCount = totalLiquidations;
-    const creditUsageFrequency = lendingTransactions.length;
-
-    console.log(`Repayment ratio: ${repaymentRatio}, Liquidation count: ${liquidationCount}, Credit usage: ${creditUsageFrequency}`);
-    
-    // Scoring logic
-    let calculatedScore = 0;
-    let scoreBand = '';
-    let scoreColor = '';
-
-    if (liquidationCount === 0 && repaymentRatio >= 1.0) {
-      calculatedScore = 90 + Math.min(10, creditUsageFrequency * 2);
-      scoreBand = 'Excellent';
-      scoreColor = 'text-green-600';
-    } else if (liquidationCount <= 2 && repaymentRatio > 0.8) {
-      calculatedScore = 70 + Math.min(19, Math.floor((repaymentRatio - 0.8) * 100));
-      scoreBand = 'Good';
-      scoreColor = 'text-emerald-500';
-    } else if (creditUsageFrequency > 3 && repaymentRatio >= 0.5 && repaymentRatio <= 0.8) {
-      calculatedScore = 40 + Math.min(29, Math.floor((repaymentRatio - 0.5) * 100));
-      scoreBand = 'Moderate';
-      scoreColor = 'text-amber-500';
-    } else {
-      calculatedScore = Math.min(39, Math.floor(repaymentRatio * 100));
-      scoreBand = 'Poor';
-      scoreColor = 'text-red-500';
-    }
-
-    // If no lending activity was found, set a default "No Data" state
-    if (lendingTransactions.length === 0) {
-      calculatedScore = 0;
-      scoreBand = 'No Data';
-      scoreColor = 'text-gray-400';
-    }
-
-    console.log(`Calculated borrowing behavior score: ${calculatedScore}, band: ${scoreBand}`);
-    
-    return {
-      score: calculatedScore,
-      repaymentRatio: repaymentRatio * 100, // Convert to percentage
-      liquidationCount,
-      creditUsageFrequency,
-      scoreBand,
-      scoreColor
+    // Calculate borrowed and repaid amounts
+    const calculateTotalAmount = (txs: Transaction[]) => {
+      return txs.reduce((sum, tx) => {
+        const amount = typeof tx.amount === 'string' ? 
+          parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+          (typeof tx.amount === 'number' ? tx.amount : 0);
+          
+        return sum + (isNaN(amount) ? 0 : Math.abs(amount));
+      }, 0);
     };
-  }, [transactions]);
-
-  const [animatedScore, setAnimatedScore] = useState(0);
-  const [animatedProgress, setAnimatedProgress] = useState(0);
-  const [animatedRepaymentRatio, setAnimatedRepaymentRatio] = useState(0);
-
-  useEffect(() => {
-    if (score > 0) {
-      // Animate the score number
-      let start = 0;
-      const duration = 1500;
-      const interval = 20;
-      const steps = duration / interval;
-      const increment = score / steps;
-      
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= score) {
-          setAnimatedScore(score);
-          clearInterval(timer);
-        } else {
-          setAnimatedScore(Math.floor(start));
-        }
-      }, interval);
-      
-      return () => clearInterval(timer);
-    }
-  }, [score]);
-
-  useEffect(() => {
-    // Animate the progress bar
-    const duration = 1000;
-    const interval = 20;
-    const steps = duration / interval;
-    const increment = score / steps;
     
-    let progress = 0;
-    const timer = setInterval(() => {
-      progress += increment;
-      if (progress >= score) {
-        setAnimatedProgress(score);
-        clearInterval(timer);
-      } else {
-        setAnimatedProgress(progress);
-      }
-    }, interval);
+    const borrowedAmount = calculateTotalAmount(borrowTxs);
+    const repaidAmount = calculateTotalAmount(repayTxs);
     
-    return () => clearInterval(timer);
-  }, [score]);
-
-  useEffect(() => {
-    // Animate the repayment ratio
-    if (repaymentRatio > 0) {
-      let start = 0;
-      const duration = 1200;
-      const interval = 30;
-      const steps = duration / interval;
-      const increment = repaymentRatio / steps;
+    // Check for lending protocol interactions
+    const lendingProtocols = [
+      'solend',
+      'port',
+      'jet',
+      'aave',
+      'mango',
+      'compound'
+    ];
+    
+    // Check for patterns indicating lending protocol usage
+    const lendingProtocolUsage = transactions.some(tx => {
+      const description = (tx.description || '').toLowerCase();
+      const source = (tx.source || '').toLowerCase();
+      const destination = (tx.destination || '').toLowerCase();
       
-      const timer = setInterval(() => {
-        start += increment;
-        if (start >= repaymentRatio) {
-          setAnimatedRepaymentRatio(repaymentRatio);
-          clearInterval(timer);
-        } else {
-          setAnimatedRepaymentRatio(start);
-        }
-      }, interval);
+      return lendingProtocols.some(protocol => 
+        description.includes(protocol) || 
+        source.includes(protocol) || 
+        destination.includes(protocol)
+      );
+    });
+    
+    // Determine if there's any borrowing activity
+    const hasBorrowActivity = loanTransactions.length > 0 || lendingProtocolUsage;
+    
+    // Calculate loan-to-value ratio (approximation)
+    const loanToValueRatio = borrowedAmount > 0 && repaidAmount > 0 ?
+      (borrowedAmount - repaidAmount) / borrowedAmount : 
+      borrowedAmount > 0 ? 1 : 0;
+    
+    // Calculate score
+    let score = 40; // Base score
+    
+    if (!hasBorrowActivity) {
+      // No borrowing can be neutral to positive
+      score = 50;
+    } else {
+      // With borrowing activity, score based on repayment behavior
+      const repaymentRatio = borrowedAmount > 0 ? Math.min(repaidAmount / borrowedAmount, 1) : 0;
       
-      return () => clearInterval(timer);
+      if (repaymentRatio >= 0.95) score = 90; // Excellent, fully repaid
+      else if (repaymentRatio >= 0.8) score = 80; // Very good, most repaid
+      else if (repaymentRatio >= 0.6) score = 70; // Good
+      else if (repaymentRatio >= 0.4) score = 60; // Above average
+      else if (repaymentRatio >= 0.2) score = 50; // Average
+      else if (repaymentRatio > 0) score = 40; // Below average
+      else score = 30; // Poor, no repayments
     }
-  }, [repaymentRatio]);
+    
+    return { 
+      hasBorrowActivity,
+      loanCount: borrowTxs.length,
+      repaymentCount: repayTxs.length,
+      borrowedAmount,
+      repaidAmount,
+      loanToValueRatio,
+      score
+    };
+  };
+  
+  const { 
+    hasBorrowActivity, 
+    loanCount, 
+    repaymentCount, 
+    borrowedAmount, 
+    repaidAmount,
+    score
+  } = calculateMetrics();
+  
+  // Calculate repayment ratio for the progress display
+  const repaymentRatio = borrowedAmount > 0 ? 
+    Math.min((repaidAmount / borrowedAmount) * 100, 100) : 0;
+    
+  // Format amounts for display
+  const formatAmount = (amount: number): string => {
+    if (amount >= 1000) return `${(amount / 1000).toFixed(1)}k`;
+    return amount.toFixed(2);
+  };
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <CreditCard className="h-4 w-4" />
-          Borrowing Behavior (DeFi)
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {score > 0 || scoreBand !== 'No Data' ? (
-          <>
-            <div className="flex flex-col space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Score</span>
-                <span className={`text-sm font-medium ${scoreColor}`}>{animatedScore}</span>
+    <div className="border rounded-lg p-4 bg-muted shadow" data-component="BorrowingBehavior">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+        <h4 className="font-semibold text-lg flex items-center gap-2">
+          <Landmark className="h-5 w-5" />
+          Borrowing Behavior
+        </h4>
+        
+        <span 
+          className={`inline-block rounded px-3 py-1 text-sm font-bold ${
+            score >= 90
+              ? "bg-green-200 text-green-800"
+              : score >= 70
+              ? "bg-yellow-200 text-yellow-800"
+              : score >= 40
+              ? "bg-orange-200 text-orange-900"
+              : "bg-red-200 text-red-800"
+          }`}
+          data-score={score}
+        >
+          Score: {score}/100
+        </span>
+      </div>
+      
+      {hasBorrowActivity ? (
+        <>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="bg-background/50 p-3 rounded-md">
+              <div className="flex justify-between items-center">
+                <h5 className="text-sm font-medium text-muted-foreground">Borrowed</h5>
+                <PiggyBank className="h-4 w-4 text-amber-500" />
               </div>
-              <Progress value={animatedProgress} className="h-2" />
-              <span className="mt-1 text-xs text-center block font-medium text-muted-foreground">{scoreBand}</span>
+              <p className="text-xl font-bold">{formatAmount(borrowedAmount)}</p>
+              <p className="text-xs text-muted-foreground">{loanCount} transactions</p>
             </div>
-
-            <div className="space-y-2 mt-4 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>Loan Repayment Rate</span>
-                </div>
-                <span className="font-medium">{animatedRepaymentRatio.toFixed(0)}%</span>
+            
+            <div className="bg-background/50 p-3 rounded-md">
+              <div className="flex justify-between items-center">
+                <h5 className="text-sm font-medium text-muted-foreground">Repaid</h5>
+                <DollarSign className="h-4 w-4 text-green-500" />
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  <span>Liquidations</span>
-                </div>
-                <span className="font-medium">{liquidationCount}</span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <CreditCard className="h-3.5 w-3.5" />
-                  <span>Lending Interactions</span>
-                </div>
-                <span className="font-medium">{creditUsageFrequency}</span>
-              </div>
+              <p className="text-xl font-bold">{formatAmount(repaidAmount)}</p>
+              <p className="text-xs text-muted-foreground">{repaymentCount} transactions</p>
             </div>
-          </>
-        ) : (
-          <div className="py-6 text-center">
-            <p className="text-sm text-muted-foreground">No lending activity detected</p>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs text-muted-foreground">Repayment Progress</span>
+              <span className="text-xs font-medium">{repaymentRatio.toFixed(1)}%</span>
+            </div>
+            <div className="h-2 bg-background rounded-full">
+              <div 
+                className={`h-full rounded-full ${
+                  repaymentRatio >= 80 ? "bg-green-500" : 
+                  repaymentRatio >= 50 ? "bg-amber-500" : 
+                  "bg-red-500"
+                }`}
+                style={{ width: `${repaymentRatio}%` }}
+              ></div>
+            </div>
+          </div>
+          
+          <div className="text-xs text-muted-foreground">
+            <p>
+              On-time loan repayments improve your credit score. Repaying loans early or in full 
+              can significantly boost your borrowing power.
+            </p>
+          </div>
+        </>
+      ) : (
+        <div className="bg-background/50 p-4 rounded-md text-center">
+          <p className="text-sm">No borrowing activity detected</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Responsible borrowing with on-time repayments can help improve your credit score
+          </p>
+        </div>
+      )}
+    </div>
   );
 };
 

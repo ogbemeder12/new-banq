@@ -1,223 +1,165 @@
-import React from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+import React from "react";
+import { ArrowDownSquare, ArrowUpSquare } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { ArrowUpRight, ArrowDownRight } from "lucide-react";
 
-interface Transaction {
-  amount: number | string;
-  currency?: string;
+type Transaction = {
   signature?: string;
-}
+  timestamp?: number;
+  blockTime?: number;
+  amount?: number | string;
+  source?: string;
+  destination?: string;
+  type?: string;
+};
 
-interface NetFlowProps {
+type Props = {
   transactions: Transaction[];
-  solToUsdcRate?: number; // Optional conversion rate for SOL to USDC
-}
+  solToUsdcRate: number;
+};
 
-const NetFlowAnalysis = ({ transactions, solToUsdcRate = 0 }: NetFlowProps) => {
-  console.log("NetFlowAnalysis received transactions:", transactions);
-  console.log("Current SOL to USDC rate:", solToUsdcRate);
-  
-  // Helper function to convert any transaction amount to SOL
-  const convertToSol = (tx: Transaction): number => {
-    try {
-      // Handle both string and number amount formats
+const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
+  const calculateNetFlow = () => {
+    if (!transactions || transactions.length === 0) {
+      return { 
+        inflow: 0, 
+        outflow: 0, 
+        netFlow: 0, 
+        formattedInflow: '0', 
+        formattedOutflow: '0',
+        score: 0
+      };
+    }
+
+    let totalInflow = 0;
+    let totalOutflow = 0;
+    
+    transactions.forEach(tx => {
       const amount = typeof tx.amount === 'string' ? 
         parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
         (typeof tx.amount === 'number' ? tx.amount : 0);
       
-      if (isNaN(amount) || amount === 0) return 0;
-      
-      // Default all amounts to USDC if not specified, then convert to SOL
-      const currency = tx.currency?.toUpperCase() || 'USDC'; // Assume USDC by default if not specified
-      
-      // If it's already in SOL, return as is
-      if (currency === 'SOL') return amount;
-      
-      // Convert all amounts (USDC or any other) to SOL if we have a valid rate
-      if (solToUsdcRate > 0) {
-        const amountInSol = amount / solToUsdcRate;
-        console.log(`Converted ${amount} ${currency} to ${amountInSol} SOL (rate: ${solToUsdcRate})`);
-        return amountInSol;
-      }
-      
-      // Default case - return original amount (should be handled better in production)
-      return amount;
-    } catch (error) {
-      console.error("Error converting transaction amount:", error);
-      return 0;
-    }
-  };
-  
-  const calculateNetFlow = (transactions: Transaction[]) => {
-    let totalInflow = 0;
-    let totalOutflow = 0;
-
-    // Only proceed if we have actual transaction data
-    if (!transactions || transactions.length === 0) {
-      console.log("No transaction data available for NetFlowAnalysis");
-      return {
-        netFlowRatio: 0,
-        score: 0,
-        totalInflow: 0,
-        totalOutflow: 0,
-        hasData: false
-      };
-    }
-
-    transactions.forEach(tx => {
-      try {
-        // Convert the transaction amount to SOL
-        const amountInSol = convertToSol(tx);
-        
-        // Skip if amount is 0
-        if (amountInSol === 0) return;
-        
-        // Use the exact same logic for both inflow and outflow:
-        // If amount is positive, it's an inflow, otherwise it's an outflow
-        if (amountInSol > 0) {
-          // Apply the same logic for inflow as outflow (no changes here)
-          totalInflow += amountInSol;
-          console.log(`Added inflow: +${amountInSol}, total inflow now: ${totalInflow}`);
-        } else if (amountInSol < 0) {
-          // Keep the outflow logic exactly as it is since it's working correctly
-          totalOutflow += Math.abs(amountInSol);
-          console.log(`Added outflow: ${amountInSol}, total outflow now: ${totalOutflow}`);
+      if (!isNaN(amount)) {
+        if (amount < 0) {
+          totalOutflow += Math.abs(amount);
+        } else if (amount > 0) {
+          totalInflow += amount;
         }
-      } catch (error) {
-        console.error("Error processing transaction in NetFlowAnalysis:", error);
       }
     });
 
-    console.log(`Total inflow: ${totalInflow}, Total outflow: ${totalOutflow}`);
-
-    // Calculate net flow only if there are valid transactions with flow data
-    if (totalInflow === 0 && totalOutflow === 0) {
-      return {
-        netFlowRatio: 0,
-        score: 10, // Assign minimal score instead of zero when no flow data
-        totalInflow,
-        totalOutflow,
-        hasData: transactions.length > 0 // Mark as having data if we have transactions
-      };
-    }
-
-    // Prevent division by zero
-    const netFlowRatio = (totalInflow + totalOutflow) === 0 ? 0 :
-      (totalInflow - totalOutflow) / (totalInflow + totalOutflow);
-
-    console.log(`Net flow ratio: ${netFlowRatio}`);
-
+    const netFlow = totalInflow - totalOutflow;
+    const hasTransactions = totalInflow > 0 || totalOutflow > 0;
+    
+    // Calculate score based on net flow - prefer positive ratios
     let score = 0;
-    if (netFlowRatio > 0.3) {
-      score = 90 + (netFlowRatio - 0.3) * 33.33; // Scale from 90-100
-    } else if (netFlowRatio >= 0) {
-      score = 60 + (netFlowRatio / 0.3) * 29; // Scale from 60-89
-    } else if (netFlowRatio >= -0.3) {
-      score = 30 + ((netFlowRatio + 0.3) / 0.3) * 29; // Scale from 30-59
-    } else {
-      score = Math.max(0, 29 + (netFlowRatio + 0.3) * 96.67); // Scale from 0-29
+    
+    if (hasTransactions) {
+      const totalVolume = totalInflow + totalOutflow;
+      const netRatio = netFlow / (totalVolume || 1);
+      
+      if (netRatio >= 0.7) score = 90; // Extremely positive net flow (saving/accumulating)
+      else if (netRatio >= 0.5) score = 85;
+      else if (netRatio >= 0.3) score = 75;
+      else if (netRatio >= 0.1) score = 65;
+      else if (netRatio >= 0) score = 55; // Slightly positive
+      else if (netRatio >= -0.2) score = 45; // Slightly negative
+      else if (netRatio >= -0.4) score = 35;
+      else if (netRatio >= -0.6) score = 25;
+      else score = 15; // Very negative flow
     }
-
+    
+    // Formatting for display
+    const formatValue = (val: number): string => {
+      if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+      if (val >= 1) return val.toFixed(1);
+      return val.toFixed(3);
+    };
+    
     return {
-      netFlowRatio,
-      score: Math.min(100, Math.max(0, Math.round(score))),
-      totalInflow,
-      totalOutflow,
-      hasData: true
+      inflow: totalInflow,
+      outflow: totalOutflow,
+      netFlow,
+      formattedInflow: formatValue(totalInflow),
+      formattedOutflow: formatValue(totalOutflow),
+      score
     };
   };
-
-  const { netFlowRatio, score, totalInflow, totalOutflow, hasData } = calculateNetFlow(transactions);
-
-  const getScoreCategory = (score: number) => {
-    if (score >= 90) return "Strong net inflow";
-    if (score >= 60) return "Mild accumulation";
-    if (score >= 30) return "Net outflow but not extreme";
-    return "Heavy net drain";
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-500";
-    if (score >= 60) return "text-emerald-400";
-    if (score >= 30) return "text-yellow-500";
-    return "text-red-500";
+  
+  const { inflow, outflow, netFlow, formattedInflow, formattedOutflow, score } = calculateNetFlow();
+  const totalVolume = inflow + outflow;
+  const inflowPercentage = inflow > 0 ? (inflow / totalVolume) * 100 : 0;
+  const outflowPercentage = outflow > 0 ? (outflow / totalVolume) * 100 : 0;
+  
+  // Color based on net flow
+  const netFlowColor = netFlow >= 0 ? "text-green-500" : "text-red-500";
+  const netFlowPrefix = netFlow >= 0 ? "+" : "";
+  const netFlowFormatted = netFlow === 0 ? "0" : `${netFlowPrefix}${netFlow.toFixed(2)}`;
+  
+  const formatUsdValue = (solAmount: number) => {
+    if (!solToUsdcRate || solToUsdcRate <= 0) return '';
+    const usdAmount = solAmount * solToUsdcRate;
+    return usdAmount >= 1 ? 
+      ` ($${usdAmount.toFixed(2)})` : 
+      ` ($${usdAmount.toFixed(4)})`;
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Net Flow Analysis</CardTitle>
-        <CardDescription>Understanding volume of money in vs money out</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          {hasData ? (
-            <>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Flow Score</span>
-                  <span className={`text-lg font-bold ${getScoreColor(score)}`}>{score}</span>
-                </div>
-                <Progress value={score} className="h-2" />
-                <p className={`text-sm ${getScoreColor(score)} font-medium text-center mt-1`}>
-                  {getScoreCategory(score)}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-green-500">
-                    <ArrowUpRight className="h-4 w-4" />
-                    <span className="text-sm font-medium">Total Inflow</span>
-                  </div>
-                  <p className="text-xl font-bold">
-                    <strong>{totalInflow.toFixed(4)} SOL</strong>
-                    {solToUsdcRate > 0 && (
-                      <span className="block text-sm text-muted-foreground mt-1">
-                        ≈ {(totalInflow * solToUsdcRate).toFixed(2)} USDC
-                      </span>
-                    )}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-red-500">
-                    <ArrowDownRight className="h-4 w-4" />
-                    <span className="text-sm font-medium">Total Outflow</span>
-                  </div>
-                  <p className="text-xl font-bold">
-                    <strong>{totalOutflow.toFixed(4)} SOL</strong>
-                    {solToUsdcRate > 0 && (
-                      <span className="block text-sm text-muted-foreground mt-1">
-                        ≈ {(totalOutflow * solToUsdcRate).toFixed(2)} USDC
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              {totalInflow === 0 && totalOutflow > 0 && (
-                <div className="mt-2 text-sm text-yellow-600 italic">
-                  ⚠️ Wallet is sending funds using previous balance. No recent inflows.
-                </div>
-              )}
-
-              <div className="pt-2 border-t">
-                <p className="text-sm text-muted-foreground">
-                  Net Flow Ratio: {(netFlowRatio * 100).toFixed(1)}%
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No transaction flow data detected in API results.</p>
-              <p className="text-sm text-muted-foreground mt-2">Please try fetching more transactions.</p>
-            </div>
-          )}
+    <div className="border rounded-lg p-4 bg-muted shadow" data-component="NetFlowAnalysis">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+        <h4 className="font-semibold text-lg">Net Flow Analysis</h4>
+        
+        <span 
+          className={`inline-block rounded px-3 py-1 text-sm font-bold ${
+            score >= 90
+              ? "bg-green-200 text-green-800"
+              : score >= 70
+              ? "bg-yellow-200 text-yellow-800"
+              : score >= 40
+              ? "bg-orange-200 text-orange-900"
+              : "bg-red-200 text-red-800"
+          }`}
+          data-score={score}
+        >
+          Score: {score}/100
+        </span>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <ArrowDownSquare className="h-4 w-4 text-green-500" />
+          <div>
+            <div className="text-xs text-muted-foreground">Inflow</div>
+            <div className="font-bold">{formattedInflow} SOL {formatUsdValue(inflow)}</div>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+        
+        <div className="flex items-center gap-2">
+          <ArrowUpSquare className="h-4 w-4 text-red-500" />
+          <div>
+            <div className="text-xs text-muted-foreground">Outflow</div>
+            <div className="font-bold">{formattedOutflow} SOL {formatUsdValue(outflow)}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="mb-2">
+        <div className="flex justify-between text-xs mb-1">
+          <span>Net Flow: <span className={netFlowColor + " font-semibold"}>{netFlowFormatted} SOL</span></span>
+          {totalVolume > 0 && <span>Total Volume: {(totalVolume).toFixed(2)} SOL</span>}
+        </div>
+        <div className="h-2 bg-gray-200 rounded-full overflow-hidden w-full">
+          <div className="flex h-full">
+            <div className="bg-green-500 h-full" style={{width: `${inflowPercentage}%`}}></div>
+            <div className="bg-red-500 h-full" style={{width: `${outflowPercentage}%`}}></div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="text-xs text-muted-foreground mt-2">
+        <p>A positive net flow indicates more assets coming in than going out, which is generally favorable for your credit score.</p>
+      </div>
+    </div>
   );
 };
 

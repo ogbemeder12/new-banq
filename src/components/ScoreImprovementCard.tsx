@@ -3,26 +3,28 @@ import React from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 
 interface ScoreImprovementCardProps {
-  title: string;
-  description: string;
-  impact: "high" | "medium" | "low";
-  difficulty: "easy" | "moderate" | "hard";
+  title?: string;
+  description?: string;
+  impact?: "high" | "medium" | "low";
+  difficulty?: "easy" | "moderate" | "hard";
   actionLabel?: string;
   onAction?: () => void;
-  icon: React.ReactNode;
+  icon?: React.ReactNode;
+  currentScore?: number;
 }
 
 const ScoreImprovementCard: React.FC<ScoreImprovementCardProps> = ({
-  title,
-  description,
-  impact,
-  difficulty,
-  actionLabel,
+  title = "Improve Your Score",
+  description = "Take these recommended actions to improve your on-chain credit score.",
+  impact = "high",
+  difficulty = "easy",
+  actionLabel = "View Improvement Plan",
   onAction,
-  icon,
+  icon = <TrendingUp className="h-6 w-6" />,
+  currentScore,
 }) => {
   const getImpactColor = () => {
     switch (impact) {
@@ -61,7 +63,12 @@ const ScoreImprovementCard: React.FC<ScoreImprovementCardProps> = ({
                 </Badge>
               </div>
             </div>
-            <p className="text-sm text-gray-300">{description}</p>
+            <p className="text-sm text-gray-300">
+              {description}
+              {currentScore !== undefined && (
+                <span className="block mt-1">Current score: {currentScore}/100</span>
+              )}
+            </p>
             {actionLabel && onAction && (
               <Button 
                 onClick={onAction}

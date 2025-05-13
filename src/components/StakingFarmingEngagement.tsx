@@ -1,14 +1,15 @@
 
 import React from "react";
-import { Activity, DollarSign, Clock, Star } from "lucide-react";
+import { LineChart, Line, YAxis, ResponsiveContainer } from "recharts";
+import { CoinsIcon, Clock } from "lucide-react";
 
 type StakingActivity = {
   validatorAddress: string;
   validatorName?: string;
   amount: number;
-  status?: string;
   timestamp?: number;
-  type?: string;
+  blockTime?: number;
+  status: string;
 };
 
 type Props = {
@@ -16,122 +17,167 @@ type Props = {
   solToUsdcRate: number;
 };
 
-const reputableProtocols = [
-  // Real reputable validators/protocol vote addresses
-  "Everstake", "Certus One", "Marinade.Finance", "Coinbase", "Binance Staking"
-];
-
-function getDurationDays(position: StakingActivity) {
-  // Calculate real duration based on Helius API data
-  const now = Date.now() / 1000;
-  if (!position.timestamp) return 0;
-  // Using real timestamp data from API
-  const duration = (now - position.timestamp) / (60 * 60 * 24);
-  return Math.max(Math.floor(duration), 0);
-}
-
-function getScore({
-  usdLocked,
-  avgDuration,
-  reputableCount,
-  activityCount
-}: {
-  usdLocked: number;
-  avgDuration: number;
-  reputableCount: number;
-  activityCount: number;
-}): number {
-  if (activityCount === 0) return 0;
-  // Scoring based on real data metrics
-  // 90–100: $5K staked, >30-day hold, major protocols
-  if (usdLocked >= 5000 && avgDuration > 30 && reputableCount > 0) return 92;
-  // 70–89: $1K–$5K, mixed use
-  if (usdLocked >= 1000 && usdLocked < 5000 && avgDuration > 10) return 80;
-  // 30–69: <$1K, short-term/risky farms
-  if (usdLocked > 0 && usdLocked < 1000) return 50;
-  return 25; // No significant or only risky/short-term
-}
-
-// US Dollar formatted string
-function usd(amount: number) {
-  return "$" + amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 const StakingFarmingEngagement: React.FC<Props> = ({ stakingActivities, solToUsdcRate }) => {
-  console.log(`Processing ${stakingActivities.length} staking activities from Helius API with SOL rate: ${solToUsdcRate}`);
+  // Calculate staking metrics
+  const calculateMetrics = () => {
+    if (!stakingActivities || stakingActivities.length === 0) {
+      return { 
+        totalStaked: 0, 
+        activeValidators: 0, 
+        avgStakeDuration: 0,
+        score: 10
+      };
+    }
+    
+    // Calculate total staked amount
+    const totalStaked = stakingActivities.reduce((sum, activity) => {
+      if (activity.status === 'Active' || activity.status === 'Delegated') {
+        return sum + activity.amount;
+      }
+      return sum;
+    }, 0);
+    
+    // Count unique validators
+    const validators = new Set(stakingActivities.map(a => a.validatorAddress));
+    const activeValidators = validators.size;
+    
+    // Calculate average stake duration (in days)
+    const now = Math.floor(Date.now() / 1000);
+    let totalDuration = 0;
+    
+    stakingActivities.forEach(activity => {
+      const startTime = activity.timestamp || activity.blockTime || now;
+      totalDuration += (now - startTime) / (24 * 60 * 60); // Convert to days
+    });
+    
+    const avgStakeDuration = stakingActivities.length > 0 ? 
+      totalDuration / stakingActivities.length : 0;
+    
+    // Calculate score based on staking behavior
+    let score = 10; // Base score
+    
+    // Factor 1: Total staked amount
+    if (totalStaked >= 100) score += 30;
+    else if (totalStaked >= 10) score += 25;
+    else if (totalStaked >= 1) score += 15;
+    else if (totalStaked > 0) score += 10;
+    
+    // Factor 2: Validator diversification
+    if (activeValidators >= 3) score += 25;
+    else if (activeValidators >= 2) score += 15;
+    else if (activeValidators >= 1) score += 10;
+    
+    // Factor 3: Staking duration
+    if (avgStakeDuration >= 180) score += 35; // 6+ months
+    else if (avgStakeDuration >= 90) score += 25; // 3+ months
+    else if (avgStakeDuration >= 30) score += 15; // 1+ month
+    else if (avgStakeDuration >= 7) score += 10; // 1+ week
+    
+    return {
+      totalStaked,
+      activeValidators,
+      avgStakeDuration,
+      score: Math.min(score, 100) // Cap at 100
+    };
+  };
   
-  // Group real staking stats from the Helius API
-  const totalLockedSol = stakingActivities.reduce((acc, x) => acc + (typeof x.amount === "number" ? x.amount : 0), 0);
-  const usdLocked = totalLockedSol * solToUsdcRate;
-  const avgDuration =
-    stakingActivities.length > 0
-      ? stakingActivities.reduce((acc, a) => acc + getDurationDays(a), 0) / stakingActivities.length
-      : 0;
-  const reputableCount = stakingActivities.filter(a =>
-    reputableProtocols.some(p =>
-      (a.validatorName || "").toLowerCase().includes(p.toLowerCase())
-    )
-  ).length;
-  const score = getScore({
-    usdLocked,
-    avgDuration,
-    reputableCount,
-    activityCount: stakingActivities.length
-  });
-
-  console.log("Rendering StakingFarmingEngagement with activities:", stakingActivities.length);
-  console.log("Stats: totalLockedSol:", totalLockedSol, "usdLocked:", usdLocked, "score:", score);
+  const { totalStaked, activeValidators, avgStakeDuration, score } = calculateMetrics();
+  
+  // Mock data for the chart (would be real data in production)
+  const generateMockData = () => {
+    const data = [];
+    const now = Math.floor(Date.now() / 1000);
+    
+    for (let i = 30; i >= 0; i--) {
+      // Create some random but trending data
+      const value = totalStaked * (0.9 + Math.random() * 0.2);
+      data.push({
+        time: now - i * 24 * 60 * 60, // Go back i days
+        value
+      });
+    }
+    
+    return data;
+  };
+  
+  const chartData = generateMockData();
+  
+  // Format stake duration
+  const formatDuration = (days: number) => {
+    if (days >= 365) return `${(days / 365).toFixed(1)} years`;
+    if (days >= 30) return `${(days / 30).toFixed(1)} months`;
+    return `${Math.round(days)} days`;
+  };
+  
+  // Calculate USD value
+  const stakingValueUsd = solToUsdcRate > 0 ? 
+    totalStaked * solToUsdcRate : 0;
 
   return (
-    <div className="border rounded-lg p-4 bg-muted shadow">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
-        <h4 className="font-semibold text-lg">Staking & Farming Engagement</h4>
-        <span className={`inline-block rounded px-3 py-1 text-sm font-bold ${score >= 90
-          ? "bg-green-200 text-green-800"
-          : score >= 70
-            ? "bg-yellow-200 text-yellow-800"
-            : score >= 30
+    <div className="border rounded-lg p-4 bg-muted shadow" data-component="StakingFarming">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+        <h4 className="font-semibold text-lg flex items-center gap-2">
+          <CoinsIcon className="h-5 w-5" />
+          Staking & Farming Engagement
+        </h4>
+        
+        <span 
+          className={`inline-block rounded px-3 py-1 text-sm font-bold ${
+            score >= 90
+              ? "bg-green-200 text-green-800"
+              : score >= 70
+              ? "bg-yellow-200 text-yellow-800"
+              : score >= 40
               ? "bg-orange-200 text-orange-900"
               : "bg-red-200 text-red-800"
-          }`}>
-          Score: {score} / 100
+          }`}
+          data-score={score}
+        >
+          Score: {score}/100
         </span>
       </div>
-      <dl className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-        <div>
-          <dt className="text-muted-foreground text-sm mb-1">Value Locked in Staking</dt>
-          <dd className="text-lg font-bold">{usd(usdLocked)} <span className="text-xs text-muted-foreground">({totalLockedSol.toFixed(4)} SOL)</span></dd>
+      
+      <div className="h-28 mb-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData}>
+            <YAxis domain={['dataMin', 'dataMax']} hide />
+            <Line 
+              type="monotone" 
+              dataKey="value" 
+              stroke="#2563eb" 
+              strokeWidth={2} 
+              dot={false} 
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-background/50 p-3 rounded-md">
+          <h5 className="text-sm font-medium text-muted-foreground">Total Staked</h5>
+          <p className="text-xl font-bold">{totalStaked.toFixed(2)} <span className="text-xs font-normal text-muted-foreground">SOL</span></p>
+          {stakingValueUsd > 0 && (
+            <p className="text-xs text-muted-foreground">${stakingValueUsd.toFixed(2)} USD</p>
+          )}
         </div>
-        <div>
-          <dt className="text-muted-foreground text-sm mb-1">Average Duration of Positions</dt>
-          <dd className="text-lg font-bold">{avgDuration.toFixed(1)} days</dd>
+        
+        <div className="bg-background/50 p-3 rounded-md">
+          <h5 className="text-sm font-medium text-muted-foreground">Validators</h5>
+          <p className="text-xl font-bold">{activeValidators} <span className="text-xs font-normal text-muted-foreground">active</span></p>
         </div>
-        <div>
-          <dt className="text-muted-foreground text-sm mb-1">Reputable Protocols Used</dt>
-          <dd className="text-lg font-bold">{reputableCount}</dd>
+        
+        <div className="bg-background/50 p-3 rounded-md">
+          <h5 className="text-sm font-medium text-muted-foreground">Avg. Duration</h5>
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <p className="text-lg font-bold">{formatDuration(avgStakeDuration)}</p>
+          </div>
         </div>
-      </dl>
-      {stakingActivities.length > 0 && (
-        <div className="mt-3">
-          <h5 className="font-semibold mb-1 text-[15px]">Active Positions</h5>
-          <ul className="divide-y text-sm">
-            {stakingActivities.map((a, i) => (
-              <li key={i} className="py-1 flex flex-col">
-                <span>
-                  <span className="font-medium">{a.validatorName || a.validatorAddress}</span>:
-                  {" "}
-                  {a.amount} SOL
-                  {" "}
-                  ({getDurationDays(a)} days)
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  Status: {a.status || "N/A"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      </div>
+      
+      <div className="mt-3 text-xs text-muted-foreground">
+        <p>Staking and yield farming activity demonstrates long-term commitment and financial stability.</p>
+      </div>
     </div>
   );
 };

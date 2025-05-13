@@ -1,14 +1,13 @@
 
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Twitter, Copy, Download } from "lucide-react";
-import { X } from "lucide-react";
+import { Twitter, Copy, Download, X } from "lucide-react";
 
 interface ShareCreditScoreProps {
   creditScore: number | null;
@@ -25,6 +24,39 @@ const ShareCreditScore: React.FC<ShareCreditScoreProps> = ({
 }) => {
   const { toast } = useToast();
   const [isImageLoaded, setIsImageLoaded] = useState(true);
+  const [memeImage, setMemeImage] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (isOpen && creditScore !== null) {
+      const goodMemes = [
+        "/Good memes/1.jpeg",
+        "/Good memes/1A.jpeg",
+        "/Good memes/2.jpg",
+        "/Good memes/3.jpg",
+        "/Good memes/4.jpeg",
+        "/Good memes/5.jpeg",
+        "/Good memes/8.jpg",
+      ];
+      
+      const badMemes = [
+        "/Bad memes/6.jpeg",
+        "/Bad memes/7.jpeg",
+        "/Bad memes/8.jpeg",
+        "/Bad memes/9.jpeg",
+        "/Bad memes/10.jpeg",
+        "/Bad memes/11.jpeg",
+        "/Bad memes/12.jpeg",
+        "/Bad memes/13.jpeg",
+        "/Bad memes/14.jpeg",
+        "/Bad memes/images.jpeg",
+      ];
+      
+      // Select meme based on score
+      const memes = creditScore >= 450 ? goodMemes : badMemes;
+      const randomIndex = Math.floor(Math.random() * memes.length);
+      setMemeImage(memes[randomIndex]);
+    }
+  }, [isOpen, creditScore]);
   
   if (!isOpen) return null;
   
@@ -91,12 +123,20 @@ const ShareCreditScore: React.FC<ShareCreditScoreProps> = ({
             </div>
             
             <div className="relative">
-              <img 
-                src="/lovable-uploads/54a59eff-a033-4cb8-be43-c1dff8d72cfd.png"
-                alt="Credit Score Image" 
-                className="w-full h-48 object-cover"
-                onError={() => setIsImageLoaded(false)}
-              />
+              {/* Display meme image based on credit score */}
+              {memeImage ? (
+                <img 
+                  src={memeImage}
+                  alt="Credit Score Meme" 
+                  className="w-full h-48 object-cover"
+                  onError={() => setIsImageLoaded(false)}
+                />
+              ) : (
+                <div className="w-full h-48 bg-gray-800 flex items-center justify-center">
+                  <p className="text-gray-400">Loading image...</p>
+                </div>
+              )}
+              
               {!isImageLoaded && (
                 <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
                   <p className="text-gray-400">Image failed to load</p>

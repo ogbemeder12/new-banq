@@ -1,215 +1,180 @@
 
-import React, { useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Shield, TrendingDown } from "lucide-react";
+import React from "react";
+import { LineChart, Line, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { CreditCard, TrendingUp, CircleDollarSign } from "lucide-react";
 
-interface Transaction {
-  amount: number | string;
-  currency?: string;
-  timestamp: number;
+type Transaction = {
   signature?: string;
-}
+  timestamp?: number;
+  blockTime?: number;
+  amount?: number | string;
+};
 
-interface MinBalanceStabilityProps {
+type Props = {
   transactions: Transaction[];
-  currentBalance?: number;
-}
+  currentBalance: number;
+};
 
-const MinBalanceStability = ({ transactions, currentBalance = 0 }: MinBalanceStabilityProps) => {
-  const metrics = useMemo(() => {
-    if (!transactions || transactions.length < 2) {
-      return {
-        score: 50,
-        minBalanceRatio: 0,
-        averageMinBalance: 0,
-        totalValue: currentBalance,
-        hasData: false
-      };
+const MinBalanceStability: React.FC<Props> = ({ transactions, currentBalance }) => {
+  // Calculate metrics based on transactions
+  const calculateMetrics = () => {
+    if (!transactions || transactions.length === 0) {
+      return { score: 0, minBalance: 0, avgBalance: 0, balanceHistory: [] };
     }
-
-    try {
-      // Extract SOL transactions only
-      const solTransactions = transactions.filter(tx => 
-        !tx.currency || tx.currency.toUpperCase() === 'SOL'
-      );
+    
+    // Sort transactions by timestamp
+    const sortedTxs = [...transactions].sort((a, b) => {
+      const timeA = a.timestamp || a.blockTime || 0;
+      const timeB = b.timestamp || b.blockTime || 0;
+      return timeA - timeB; // Oldest first
+    });
+    
+    let runningBalance = currentBalance;
+    let minBalance = currentBalance;
+    let totalBalance = currentBalance;
+    let dataPoints = 1;
+    
+    // Generate balance history by "reversing" transactions
+    const balanceHistory = sortedTxs.map(tx => {
+      const amount = typeof tx.amount === 'string' ? 
+        parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
+        (typeof tx.amount === 'number' ? tx.amount : 0);
       
-      console.log(`Analyzing ${solTransactions.length} SOL transactions for minimum balance stability`);
-
-      // Sort transactions by timestamp (oldest first)
-      const sortedTransactions = [...solTransactions].sort((a, b) => a.timestamp - b.timestamp);
-      
-      // Calculate historical balances
-      const historicalBalances: number[] = [];
-      let runningBalance = currentBalance;
-      
-      // Work backwards from current balance to calculate historical balances
-      for (let i = sortedTransactions.length - 1; i >= 0; i--) {
-        const tx = sortedTransactions[i];
-        const amount = typeof tx.amount === 'string' ? 
-          parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
-          (typeof tx.amount === 'number' ? tx.amount : 0);
-        
-        if (!isNaN(amount)) {
-          // Reverse the transaction to go backwards in time
-          runningBalance -= amount;
-          historicalBalances.push(runningBalance);
-          
-          console.log(`Historical balance after reverting transaction ${tx.signature?.substring(0, 6)}: ${runningBalance.toFixed(4)} SOL`);
+      // For history, we need to reverse transactions to calculate previous balance
+      if (!isNaN(amount)) {
+        if (amount < 0) {
+          // If outgoing, add back to calculate previous balance
+          runningBalance -= Math.abs(amount);
+        } else if (amount > 0) {
+          // If incoming, subtract to calculate previous balance
+          runningBalance += amount;
         }
       }
       
-      // Find the absolute minimum balance observed
-      const minBalance = Math.min(...historicalBalances, currentBalance);
-      console.log(`Minimum observed balance: ${minBalance.toFixed(4)} SOL`);
-      
-      // Calculate daily minimum balances
-      const dailyMinimums: Record<string, number> = {};
-      runningBalance = currentBalance;
-      
-      // Reset and calculate daily minimums going forward
-      for (let i = sortedTransactions.length - 1; i >= 0; i--) {
-        const tx = sortedTransactions[i];
-        const amount = typeof tx.amount === 'string' ? 
-          parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
-          (typeof tx.amount === 'number' ? tx.amount : 0);
-          
-        if (isNaN(amount)) continue;
-        
-        // Get day from timestamp
-        const day = new Date(tx.timestamp * 1000).toISOString().split('T')[0];
-        
-        // Update running balance (subtract amount since we're going backwards)
-        runningBalance -= amount;
-        
-        // Update daily minimum
-        if (!dailyMinimums[day] || runningBalance < dailyMinimums[day]) {
-          dailyMinimums[day] = runningBalance;
-        }
+      // Track minimum balance
+      if (runningBalance < minBalance) {
+        minBalance = runningBalance;
       }
       
-      // Calculate average minimum daily balance
-      const minBalances = Object.values(dailyMinimums);
-      const averageMinBalance = minBalances.length > 0 
-        ? minBalances.reduce((sum, bal) => sum + Math.max(0, bal), 0) / minBalances.length 
-        : Math.max(0, minBalance);
-        
-      console.log(`Average minimum daily balance: ${averageMinBalance.toFixed(4)} SOL from ${minBalances.length} days`);
-
-      // Calculate ratio of average minimum balance to total wallet value
-      const totalValue = Math.max(currentBalance, ...minBalances, 0.001); // Avoid division by zero
-      const minBalanceRatio = Math.max(0, averageMinBalance) / totalValue;
+      // Track for average calculation
+      totalBalance += runningBalance;
+      dataPoints++;
       
-      console.log(`Min balance ratio: ${(minBalanceRatio * 100).toFixed(2)}% (${averageMinBalance.toFixed(4)} / ${totalValue.toFixed(4)})`);
-
-      // Calculate score based on ratio thresholds
-      let score = 0;
-      if (minBalanceRatio >= 0.5) {
-        score = 90 + (minBalanceRatio - 0.5) * 20; // Scale 90-100
-      } else if (minBalanceRatio >= 0.3) {
-        score = 70 + ((minBalanceRatio - 0.3) / 0.2) * 19; // Scale 70-89
-      } else if (minBalanceRatio >= 0.1) {
-        score = 40 + ((minBalanceRatio - 0.1) / 0.2) * 29; // Scale 40-69
-      } else {
-        score = Math.max(20, (minBalanceRatio / 0.1) * 39); // Scale 20-39
-      }
-
-      console.log(`Final stability score: ${Math.round(score)}`);
-
-      return {
-        score: Math.round(score),
-        minBalanceRatio,
-        averageMinBalance,
-        totalValue,
-        hasData: true
+      // Return data point for charting
+      return { 
+        time: tx.timestamp || tx.blockTime || 0, 
+        balance: Math.max(0, runningBalance) // Prevent negative for display
       };
-    } catch (error) {
-      console.error("Error calculating minimum balance stability:", error);
-      return {
-        score: 50,
-        minBalanceRatio: 0,
-        averageMinBalance: 0,
-        totalValue: currentBalance,
-        hasData: false
-      };
-    }
-  }, [transactions, currentBalance]);
-
-  const getScoreCategory = (score: number) => {
-    if (score >= 90) return "Very High Stability";
-    if (score >= 70) return "High Stability";
-    if (score >= 40) return "Moderate Stability";
-    return "Low Stability";
+    }).reverse(); // Reverse again so most recent is last
+    
+    // Calculate average balance
+    const avgBalance = dataPoints > 0 ? totalBalance / dataPoints : 0;
+    
+    // Calculate score based on minimum balance stability
+    // Higher score for higher minimum balance relative to average
+    const minToAvgRatio = avgBalance > 0 ? minBalance / avgBalance : 0;
+    
+    let score = 0;
+    if (minToAvgRatio >= 0.9) score = 95; // Very stable, minimum very close to average
+    else if (minToAvgRatio >= 0.75) score = 85;
+    else if (minToAvgRatio >= 0.5) score = 75;
+    else if (minToAvgRatio >= 0.25) score = 60;
+    else if (minToAvgRatio >= 0.1) score = 40;
+    else if (minToAvgRatio > 0) score = 30;
+    else score = 20; // Minimum went to zero or negative
+    
+    // Boost score if current balance is significantly higher than minimum
+    const growthRatio = minBalance > 0 ? currentBalance / minBalance : 0;
+    if (growthRatio >= 5) score = Math.min(score + 15, 100);
+    else if (growthRatio >= 2) score = Math.min(score + 10, 100);
+    else if (growthRatio >= 1.5) score = Math.min(score + 5, 100);
+    
+    return {
+      score,
+      minBalance,
+      avgBalance,
+      balanceHistory: balanceHistory.slice(-10) // Just use last 10 points for chart
+    };
   };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-500";
-    if (score >= 70) return "text-emerald-400";
-    if (score >= 40) return "text-yellow-500";
-    return "text-red-500";
+  
+  const { score, minBalance, avgBalance, balanceHistory } = calculateMetrics();
+  
+  // Format for display
+  const formattedMin = minBalance.toFixed(4);
+  const formattedAvg = avgBalance.toFixed(4);
+  const formattedCurrent = currentBalance.toFixed(4);
+  
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-background p-2 border rounded shadow text-xs">
+          <p>Balance: {payload[0].value.toFixed(4)} SOL</p>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Minimum Balance Stability</CardTitle>
-        <CardDescription>Analysis of maintained minimum balance relative to total value</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Stability Score</span>
-              <span className={`text-lg font-bold ${getScoreColor(metrics.score)}`}>
-                {metrics.score}
-              </span>
-            </div>
-            <Progress value={metrics.score} className="h-2" />
-            {!metrics.hasData && (
-              <p className="text-xs text-muted-foreground mt-1 text-center">
-                Insufficient transaction data for stability analysis
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-blue-500">
-                <Shield className="h-4 w-4" />
-                <span className="text-sm font-medium">Min Balance Ratio</span>
-              </div>
-              <p className="text-xl font-bold">
-                {(metrics.minBalanceRatio * 100).toFixed(1)}%
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Avg Min Balance / Total Value
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-purple-500">
-                <TrendingDown className="h-4 w-4" />
-                <span className="text-sm font-medium">Average Min Balance</span>
-              </div>
-              <p className="text-xl font-bold">
-                {metrics.averageMinBalance.toFixed(4)} SOL
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Daily minimum average
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t">
-            <p className="text-sm text-muted-foreground">
-              <strong>{getScoreCategory(metrics.score)}:</strong> {metrics.hasData ? 
-                `Maintains ${(metrics.minBalanceRatio * 100).toFixed(1)}% of total value (${metrics.totalValue.toFixed(4)} SOL)` :
-                "No stability data available"}
-            </p>
-          </div>
+    <div className="border rounded-lg p-4 bg-muted shadow" data-component="MinBalanceStability">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
+        <h4 className="font-semibold text-lg flex items-center gap-2">
+          <CircleDollarSign className="h-5 w-5" />
+          Minimum Balance Stability
+        </h4>
+        
+        <span 
+          className={`inline-block rounded px-3 py-1 text-sm font-bold ${
+            score >= 90
+              ? "bg-green-200 text-green-800"
+              : score >= 70
+              ? "bg-yellow-200 text-yellow-800"
+              : score >= 40
+              ? "bg-orange-200 text-orange-900"
+              : "bg-red-200 text-red-800"
+          }`}
+          data-score={score}
+        >
+          Score: {score}/100
+        </span>
+      </div>
+      
+      <div className="h-32 mb-3">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={balanceHistory}>
+            <YAxis domain={['dataMin', 'dataMax']} hide />
+            <Line 
+              type="monotone" 
+              dataKey="balance" 
+              stroke="#9333ea" 
+              strokeWidth={2} 
+              dot={false}
+              activeDot={{ r: 4 }} 
+            />
+            <Tooltip content={<CustomTooltip />} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-1 text-center">
+        <div className="p-2">
+          <p className="text-xs text-muted-foreground">Minimum</p>
+          <p className="font-bold">{formattedMin}</p>
         </div>
-      </CardContent>
-    </Card>
+        <div className="p-2">
+          <p className="text-xs text-muted-foreground">Average</p>
+          <p className="font-bold">{formattedAvg}</p>
+        </div>
+        <div className="p-2">
+          <p className="text-xs text-muted-foreground">Current</p>
+          <p className="font-bold">{formattedCurrent}</p>
+        </div>
+      </div>
+      
+      <div className="mt-3 text-xs text-muted-foreground">
+        <p>Higher scores are awarded for maintaining consistent minimum balances without dipping too low.</p>
+      </div>
+    </div>
   );
 };
 

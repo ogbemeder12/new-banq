@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Clock, Calendar, TrendingUp } from "lucide-react";
 
@@ -104,7 +103,7 @@ const WalletAgeLongevity: React.FC<Props> = ({ transactions }) => {
   });
 
   return (
-    <div className="border rounded-lg p-4 bg-muted shadow">
+    <div className="border rounded-lg p-4 bg-muted shadow" data-component="WalletAgeLongevity">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
         <h4 className="font-semibold text-lg flex items-center gap-2">
           <Clock className="inline-block h-5 w-5 mr-1" />
@@ -120,6 +119,7 @@ const WalletAgeLongevity: React.FC<Props> = ({ transactions }) => {
               ? "bg-orange-200 text-orange-900"
               : "bg-red-200 text-red-800"
           }`}
+          data-score={score}
         >
           Score: {score} / 100
         </span>
