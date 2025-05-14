@@ -981,7 +981,7 @@ const WalletLookup = () => {
           <Card className="w-full max-w-md bg-[#1a1130] border-purple-900/50">
             <CardContent className="pt-6">
               <div className="text-center mb-4">
-                <h2 className="text-2xl font-bold text-purple-300">Connect Your Wallet</h2>
+                {/* <h2 className="text-2xl font-bold text-purple-300">Connect Your Wallet</h2> */}
                 <p className="text-sm text-gray-400">Enter your Solana wallet to see your credit score</p>
               </div>
 
@@ -1093,12 +1093,6 @@ const WalletLookup = () => {
                   </Button>
                 </div>
               </div>
-              {balance && (
-                <div className="text-right">
-                  <p className="text-sm text-gray-400">Balance</p>
-                  <p className="text-lg font-semibold">{balance.amount.toFixed(4)} {balance.currency}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1317,19 +1311,6 @@ const WalletLookup = () => {
                   <Link className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-2 rounded-full flex items-center justify-center" to="/signup">
                     <button className="text-center">create profile</button>
                   </Link>
-
-                  {/* Additional cards for strategic tool usage and collateral management */}
-                  {/* <div className="grid gap-4 mt-6">
-                    <CollateralManagement
-                      transactions={transactions}
-                    />
-                    <TokenPortfolioHealth
-                      transactions={transactions}
-                    />
-                    <StrategicToolUsage
-                      transactions={transactions}
-                    />
-                  </div> */}
                 </div>
               </CardContent>
             </Card>

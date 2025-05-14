@@ -101,27 +101,71 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
 
     console.log(`Average LTV: ${avgLTV}%, Top-up frequency: ${topUpFrequency}`);
 
-    // Calculate score based on metrics
+    // Calculate score based on new algorithm:
+    // Avg. LTV < 50%, frequent collateral management: 90–100
+    // LTV 50–70%, occasional management: 60–89
+    // LTV 70–85%, minimal top-ups: 30–59
+    // LTV > 85% often, no top-ups: 0–29
+    
     let calculatedScore = 0;
     let scoreBand = '';
     let scoreColor = '';
 
-    if (avgLTV < 50 && topUpFrequency >= 5) {
-      calculatedScore = 90 + Math.min(10, topUpFrequency);
+    // Define what counts as frequent/occasional/minimal top-ups
+    const isFrequentTopUp = topUpFrequency >= 5;
+    const isOccasionalTopUp = topUpFrequency >= 3 && topUpFrequency < 5;
+    const isMinimalTopUp = topUpFrequency >= 1 && topUpFrequency < 3;
+    const hasNoTopUps = topUpFrequency === 0;
+
+    if (avgLTV < 50 && isFrequentTopUp) {
+      // Avg. LTV < 50%, frequent collateral management: 90–100
+      calculatedScore = 90 + Math.min(10, topUpFrequency - 4);
       scoreBand = 'Excellent';
       scoreColor = 'text-green-600';
-    } else if (avgLTV >= 50 && avgLTV < 70 && topUpFrequency >= 3) {
-      calculatedScore = 60 + Math.min(29, Math.floor((70 - avgLTV) * 2));
+    } else if (avgLTV < 50 && (isOccasionalTopUp || isMinimalTopUp)) {
+      // Good but not excellent (LTV good but not frequent enough top-ups)
+      calculatedScore = 85;
+      scoreBand = 'Very Good';
+      scoreColor = 'text-green-600';
+    } else if (avgLTV >= 50 && avgLTV < 70 && (isFrequentTopUp || isOccasionalTopUp)) {
+      // LTV 50–70%, occasional management: 60–89
+      const baseScore = 60;
+      const ltvFactor = (70 - avgLTV) / 20; // 0-1 scale for LTV between 50-70%
+      const topUpFactor = isFrequentTopUp ? 1 : 0.7; // Bonus for frequency
+      calculatedScore = baseScore + Math.round(29 * ltvFactor * topUpFactor);
       scoreBand = 'Good';
       scoreColor = 'text-emerald-500';
-    } else if (avgLTV >= 70 && avgLTV < 85) {
-      calculatedScore = 30 + Math.min(29, Math.floor((85 - avgLTV) * 2));
+    } else if (avgLTV >= 70 && avgLTV < 85 && (isOccasionalTopUp || isMinimalTopUp)) {
+      // LTV 70–85%, minimal top-ups: 30–59
+      const baseScore = 30;
+      const ltvFactor = (85 - avgLTV) / 15; // 0-1 scale for LTV between 70-85%
+      const topUpFactor = isOccasionalTopUp ? 1 : 0.7; // Bonus for frequency
+      calculatedScore = baseScore + Math.round(29 * ltvFactor * topUpFactor);
       scoreBand = 'Moderate';
       scoreColor = 'text-amber-500';
-    } else {
-      calculatedScore = Math.min(29, Math.floor((100 - avgLTV) / 2));
+    } else if (avgLTV >= 85 || hasNoTopUps) {
+      // LTV > 85% often, no top-ups: 0–29
+      const baseScore = 0;
+      const ltvFactor = Math.max(0, Math.min(1, (100 - avgLTV) / 15)); // 0-1 scale for LTV above 85%
+      const topUpBonus = !hasNoTopUps ? 5 : 0; // Small bonus for any top-ups
+      calculatedScore = baseScore + Math.round(29 * ltvFactor) + topUpBonus;
       scoreBand = 'Poor';
       scoreColor = 'text-red-500';
+    } else {
+      // Fallback for edge cases
+      const estimatedScore = Math.max(15, 100 - avgLTV - (5 * (5 - topUpFrequency)));
+      calculatedScore = Math.min(95, Math.max(10, estimatedScore));
+      
+      if (calculatedScore >= 70) {
+        scoreBand = 'Good';
+        scoreColor = 'text-emerald-500';
+      } else if (calculatedScore >= 40) {
+        scoreBand = 'Moderate';
+        scoreColor = 'text-amber-500';
+      } else {
+        scoreBand = 'Poor';
+        scoreColor = 'text-red-500';
+      }
     }
 
     // If no collateral activity was found, set a default "No Data" state
@@ -130,6 +174,9 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
       scoreBand = 'No Data';
       scoreColor = 'text-gray-400';
     }
+
+    // Ensure score is in valid range
+    calculatedScore = Math.min(100, Math.max(0, Math.round(calculatedScore)));
 
     return {
       score: calculatedScore,
@@ -164,6 +211,8 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
       }, interval);
       
       return () => clearInterval(timer);
+    } else {
+      setAnimatedScore(0);
     }
   }, [score]);
 
@@ -187,6 +236,8 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
       }, interval);
       
       return () => clearInterval(timer);
+    } else {
+      setAnimatedLTV(0);
     }
   }, [avgLTV]);
 
@@ -211,8 +262,23 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
     return () => clearInterval(timer);
   }, [score]);
 
+  // Define descriptions for each score range
+  const getLTVDescription = () => {
+    if (avgLTV < 50) return "Low risk (<50%)";
+    if (avgLTV < 70) return "Medium risk (50-70%)";
+    if (avgLTV < 85) return "High risk (70-85%)";
+    return "Very high risk (>85%)";
+  };
+
+  const getTopUpDescription = () => {
+    if (topUpFrequency >= 5) return "Frequent management";
+    if (topUpFrequency >= 3) return "Regular management";
+    if (topUpFrequency >= 1) return "Minimal management";
+    return "No active management";
+  };
+
   return (
-    <Card>
+    <Card data-component="CollateralManagement">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Shield className="h-4 w-4" />
@@ -227,7 +293,7 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
                 <span className="text-xs text-muted-foreground">Score</span>
                 <span className={`text-sm font-medium ${scoreColor}`}>{animatedScore}</span>
               </div>
-              <Progress value={animatedProgress} className="h-2" />
+              <Progress value={animatedProgress} className="h-2" data-score={score} />
               <span className="mt-1 text-xs text-center block font-medium text-muted-foreground">{scoreBand}</span>
             </div>
 
@@ -237,7 +303,7 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
                   <PercentIcon className="h-3.5 w-3.5" />
                   <span>Average LTV</span>
                 </div>
-                <span className="font-medium">{animatedLTV.toFixed(1)}%</span>
+                <span className="font-medium">{animatedLTV.toFixed(1)}% <span className="text-xs font-normal text-muted-foreground">({getLTVDescription()})</span></span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -245,13 +311,21 @@ const CollateralManagement: React.FC<CollateralManagementProps> = ({ transaction
                   <ArrowUpCircle className="h-3.5 w-3.5" />
                   <span>Top-up Frequency</span>
                 </div>
-                <span className="font-medium">{topUpFrequency}</span>
+                <span className="font-medium">{topUpFrequency} <span className="text-xs font-normal text-muted-foreground">({getTopUpDescription()})</span></span>
+              </div>
+
+              <div className="pt-3 text-xs text-muted-foreground mt-2">
+                <p>LTV &lt;50% + frequent management: 90-100</p>
+                <p>LTV 50-70% + occasional management: 60-89</p>
+                <p>LTV 70-85% + minimal management: 30-59</p>
+                <p>LTV &gt;85% or no management: 0-29</p>
               </div>
             </div>
           </>
         ) : (
           <div className="py-6 text-center">
             <p className="text-sm text-muted-foreground">No collateral activity detected</p>
+            <p className="text-xs text-muted-foreground mt-2">Score based on LTV and collateral management frequency</p>
           </div>
         )}
       </CardContent>

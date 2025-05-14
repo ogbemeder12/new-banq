@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Clock, Calendar, TrendingUp } from "lucide-react";
 
@@ -61,24 +62,38 @@ function getScore({
   const sixMonthsInDays = 182;
   const threeMonthsInDays = 91;
 
-  // Calculate score based on wallet age and activity
-  if (walletAgeDays >= yearInDays && activePercent > 70) return 95;
-  if (walletAgeDays >= yearInDays && activePercent > 50) return 85;
-  if (walletAgeDays >= yearInDays && activePercent > 30) return 75;
-  if (walletAgeDays >= sixMonthsInDays && activePercent > 50) return 80;
-  if (walletAgeDays >= sixMonthsInDays && activePercent > 30) return 70;
-  if (walletAgeDays >= sixMonthsInDays && activePercent > 10) return 60;
-  if (walletAgeDays >= threeMonthsInDays && activePercent > 30) return 50;
-  if (walletAgeDays >= threeMonthsInDays && activePercent > 10) return 40;
-  if (walletAgeDays >= threeMonthsInDays) return 30;
+  // Calculate score based on Algorithm #8: Wallet Age & Longevity
+  // Scoring according to specified algorithm:
+  // 1 year old, active >70% of time: 90–100
+  // 6–12 months, active >50% of time: 70–89
+  // 3–6 months, moderate use: 40–69
+  // <3 months or barely used: 0–39
   
-  // For newer wallets, adjust score based on activity level
-  if (walletAgeDays >= 30 && activePercent > 50) return 35;
-  if (walletAgeDays >= 30 && activePercent > 20) return 30;
-  if (walletAgeDays >= 30) return 25;
+  if (walletAgeDays >= yearInDays) {
+    if (activePercent > 70) return 90 + Math.min(10, (activePercent - 70) / 3);
+    if (activePercent > 50) return 70 + (activePercent - 50) / 2;
+    if (activePercent > 30) return 40 + (activePercent - 30) / 0.75;
+    return Math.max(0, 30 + activePercent / 3);
+  }
   
-  // Very new wallets
-  return Math.max(20, Math.min(25, Math.round(walletAgeDays) + Math.round(activePercent / 5)));
+  if (walletAgeDays >= sixMonthsInDays) {
+    if (activePercent > 50) return 70 + Math.min(19, (activePercent - 50) / 2.5);
+    if (activePercent > 30) return 40 + (activePercent - 30) / 1.5;
+    return Math.max(0, 20 + activePercent / 3);
+  }
+  
+  if (walletAgeDays >= threeMonthsInDays) {
+    if (activePercent > 50) return 50 + Math.min(19, activePercent - 50);
+    if (activePercent > 30) return 40 + (activePercent - 30) / 2;
+    return Math.max(0, 10 + activePercent / 3);
+  }
+  
+  // Less than 3 months
+  if (activePercent > 70) return 35 + Math.min(4, walletAgeDays / 30);
+  if (activePercent > 50) return 25 + Math.min(10, walletAgeDays / 30);
+  
+  // Very new or rarely used wallets
+  return Math.max(0, Math.min(24, (walletAgeDays / 4) + (activePercent / 5)));
 }
 
 const WalletAgeLongevity: React.FC<Props> = ({ transactions }) => {
@@ -103,7 +118,7 @@ const WalletAgeLongevity: React.FC<Props> = ({ transactions }) => {
   });
 
   return (
-    <div className="border rounded-lg p-4 bg-muted shadow" data-component="WalletAgeLongevity">
+    <div className="border rounded-lg p-4 bg-muted shadow" data-component="WalletAge">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
         <h4 className="font-semibold text-lg flex items-center gap-2">
           <Clock className="inline-block h-5 w-5 mr-1" />
@@ -121,7 +136,7 @@ const WalletAgeLongevity: React.FC<Props> = ({ transactions }) => {
           }`}
           data-score={score}
         >
-          Score: {score} / 100
+          Score: {Math.round(score)} / 100
         </span>
       </div>
       <dl className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">

@@ -81,13 +81,30 @@ const ShareCreditScore: React.FC<ShareCreditScoreProps> = ({
     window.open(url, '_blank');
   };
 
+  // const handleSave = () => {
+  //   // In a real app, this would generate and download an image
+  //   toast({
+  //     title: "Image saved",
+  //     description: "Your credit score card has been saved"
+  //   });
+  // };
+
   const handleSave = () => {
-    // In a real app, this would generate and download an image
+  if (memeImage) {
+    const link = document.createElement('a');
+    link.href = memeImage;
+    link.download = "branq-credit-score.jpg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     toast({
       title: "Image saved",
-      description: "Your credit score card has been saved"
+      description: "Your credit score card has been saved",
     });
-  };
+  }
+};
+
 
   const getStatusColor = () => {
     switch(scoreStatus) {

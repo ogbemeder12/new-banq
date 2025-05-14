@@ -18,7 +18,15 @@ const TransactionPatternsConsistency: React.FC<Props> = ({ transactions, current
   // Calculate metrics based on transactions
   const calculateMetrics = () => {
     if (!transactions || transactions.length === 0) {
-      return { avgWeeklyTx: 0, score: 0, minSolBuffer: 0, calculatedBuffer: 0 };
+      return { 
+        avgWeeklyTx: 0, 
+        score: 0, 
+        minSolBuffer: 0, 
+        calculatedBuffer: 0, 
+        insufficientBufferTimes: 0,  // Add this missing property
+        transactionsCount: 0,
+        solTransactionsCount: 0
+      };
     }
     
     // Count transactions in past week for transaction frequency
@@ -30,21 +38,7 @@ const TransactionPatternsConsistency: React.FC<Props> = ({ transactions, current
       return txTime >= oneWeekAgo;
     }).length;
     
-    // Calculate average tx fee from transactions
-    let totalFees = 0;
-    const txsWithFees = transactions.filter(tx => tx.amount !== undefined).length;
-    
-    if (txsWithFees > 0) {
-      // Simulate fees calculation (in a real app, this would use actual fee data)
-      totalFees = transactions.reduce((sum, tx) => {
-        // Simplified fee calculation - in reality would be actual transaction fees
-        return sum + 0.000005; // ~5000 lamports per tx as example
-      }, 0);
-    }
-    
-    const avgFee = txsWithFees > 0 ? totalFees / txsWithFees : 0;
-    
-    // Calculate average weekly volume
+    // Calculate average weekly tx count
     const avgWeeklyTx = Math.round(weeklyTransactions);
     
     // Find minimum balance over transaction history
@@ -57,14 +51,10 @@ const TransactionPatternsConsistency: React.FC<Props> = ({ transactions, current
       return !isNaN(amount);
     });
     
-    // Calculate a good buffer based on recent transaction volume and fees
-    const safetyBuffer = Math.max(avgWeeklyTx * avgFee * 2, 0.002); // Minimum 0.002 SOL buffer
-    
-    // Simulate historical minimum balance calculation
-    let minBalance = currentBalance;
+    // Calculate if SOL buffer was ever below 0.1 SOL
+    let insufficientBufferTimes = 0;
+    let minBuffer = currentBalance;
     let simulatedBalance = currentBalance;
-    
-    console.log("Starting balance simulation from current balance:", simulatedBalance);
     
     // Sort transactions by timestamp (recent first)
     const sortedTxs = [...solTransactions].sort((a, b) => {
@@ -86,73 +76,54 @@ const TransactionPatternsConsistency: React.FC<Props> = ({ transactions, current
         simulatedBalance -= amount; // Subtract incoming amount
       }
       
-      console.log(`Transaction ${tx.signature?.substring(0, 6)} with amount ${amount}, new balance: ${simulatedBalance}`);
-      
       // Track minimum balance
-      if (simulatedBalance < minBalance) {
-        minBalance = simulatedBalance;
+      if (simulatedBalance < minBuffer) {
+        minBuffer = simulatedBalance;
+      }
+      
+      // Check if buffer was ever below 0.1 SOL
+      if (simulatedBalance < 0.1) {
+        insufficientBufferTimes++;
       }
     });
     
-    console.log("Final minimum balance from historical simulation:", minBalance);
+    // Calculate a good buffer based on usage patterns
+    const recommendedBuffer = Math.max(0.1, avgWeeklyTx * 0.005); // 0.005 SOL per weekly tx
     
-    // Find when balance was lowest
-    let lowestBalance = currentBalance;
-    let lowestBalanceTx = '';
+    // Calculate score based on Algorithm #7: Transaction Patterns & Consistency
+    let score = 0;
     
-    simulatedBalance = currentBalance;
-    sortedTxs.forEach(tx => {
-      const amount = typeof tx.amount === 'string' ? 
-        parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
-        (typeof tx.amount === 'number' ? tx.amount : 0);
-      
-      // Subtract amount if it was an outgoing transaction
-      if (amount < 0) {
-        simulatedBalance += Math.abs(amount);
-      } else if (amount > 0) {
-        simulatedBalance -= amount;
-      }
-      
-      if (simulatedBalance < lowestBalance) {
-        lowestBalance = simulatedBalance;
-        lowestBalanceTx = tx.signature || '';
-      }
-    });
+    // Metric A: Avg. Weekly Tx Count
+    if (avgWeeklyTx >= 10) {
+      score += 50;
+    } else if (avgWeeklyTx >= 5) {
+      score += 35;
+    } else if (avgWeeklyTx >= 1) {
+      score += 20;
+    } else {
+      score += 10;
+    }
     
-    console.log("Lowest balance found:", lowestBalance, "from transaction", lowestBalanceTx?.substring(0, 6));
+    // Metric B: SOL Fee Balance Maintained
+    if (insufficientBufferTimes === 0 && minBuffer >= 0.1) {
+      score += 50; // Always maintained good buffer
+    } else if (insufficientBufferTimes <= 2 && minBuffer > 0.05) {
+      score += 35; // Rarely went below threshold
+    } else if (insufficientBufferTimes <= 5) {
+      score += 20; // Sometimes out of gas
+    } else {
+      score += 10; // Frequent dry spells
+    }
     
-    // Calculate score based on pattern consistency and buffer amount
-    let score = 50; // Default score
-    
-    // Factor 1: Transaction frequency consistency
-    if (avgWeeklyTx >= 20) score += 20;
-    else if (avgWeeklyTx >= 10) score += 15;
-    else if (avgWeeklyTx >= 5) score += 10;
-    else score += 5;
-    
-    // Factor 2: Maintain good minimum balance
-    const minBalanceRatio = minBalance / Math.max(currentBalance, 0.001);
-    if (minBalanceRatio > 0.9) score += 30;
-    else if (minBalanceRatio > 0.7) score += 25;
-    else if (minBalanceRatio > 0.5) score += 20;
-    else if (minBalanceRatio > 0.3) score += 15;
-    else if (minBalanceRatio > 0.1) score += 10;
-    else score += 5;
-    
-    // Factor 3: Safety buffer amount
-    if (currentBalance > safetyBuffer * 10) score += 20;
-    else if (currentBalance > safetyBuffer * 5) score += 15;
-    else if (currentBalance > safetyBuffer * 2) score += 10;
-    else if (currentBalance > safetyBuffer) score += 5;
-    
-    // Cap the score at 100
-    score = Math.min(score, 100);
+    // Cap at 100
+    score = Math.min(100, score);
     
     const metrics = {
       avgWeeklyTx,
-      minSolBuffer: lowestBalance,
+      minSolBuffer: minBuffer,
       currentBalance,
-      calculatedBuffer: safetyBuffer,
+      calculatedBuffer: recommendedBuffer,
+      insufficientBufferTimes,
       score,
       transactionsCount: transactions.length,
       solTransactionsCount: solTransactions.length
@@ -163,10 +134,17 @@ const TransactionPatternsConsistency: React.FC<Props> = ({ transactions, current
     return metrics;
   };
   
-  const { avgWeeklyTx, score, minSolBuffer, calculatedBuffer } = calculateMetrics();
+  const metrics = calculateMetrics();
+  const { avgWeeklyTx, score, minSolBuffer, calculatedBuffer } = metrics;
+  const insufficientBufferTimes = metrics.insufficientBufferTimes || 0;
   
-  const bufferMultiple = currentBalance > 0 && calculatedBuffer > 0 ? 
-    (currentBalance / calculatedBuffer).toFixed(1) + 'x' : 'N/A';
+  const bufferStatus = insufficientBufferTimes === 0 ? 
+    "Always maintained" : 
+    insufficientBufferTimes <= 2 ? 
+      "Rarely insufficient" : 
+      insufficientBufferTimes <= 5 ?
+        "Sometimes low" :
+        "Frequently insufficient";
   
   return (
     <div className="border rounded-lg p-4 bg-muted shadow" data-component="TransactionPatterns">
@@ -199,18 +177,23 @@ const TransactionPatternsConsistency: React.FC<Props> = ({ transactions, current
         </div>
         
         <div className="bg-background/50 p-3 rounded-md">
-          <h5 className="text-sm font-medium text-muted-foreground">Lowest Balance</h5>
+          <h5 className="text-sm font-medium text-muted-foreground">SOL Fee Buffer</h5>
           <p className="text-xl font-bold">{minSolBuffer.toFixed(4)} <span className="text-xs font-normal text-muted-foreground">SOL</span></p>
         </div>
         
         <div className="bg-background/50 p-3 rounded-md">
-          <h5 className="text-sm font-medium text-muted-foreground">Safety Buffer</h5>
-          <p className="text-xl font-bold">{bufferMultiple} <span className="text-xs font-normal text-muted-foreground">buffer</span></p>
+          <h5 className="text-sm font-medium text-muted-foreground">Buffer Status</h5>
+          <p className="text-lg font-bold">{bufferStatus}</p>
         </div>
       </div>
       
       <div className="mt-3 text-xs text-muted-foreground">
-        <p>Transaction consistency score is based on your activity patterns, minimum balances maintained, and safety buffers.</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>10+ tx/week, SOL fee buffer always &gt; 0.1 SOL: 90–100</li>
+          <li>5–10 tx/week, buffer maintained: 70–89</li>
+          <li>1–5 tx/week, sometimes out of gas: 40–69</li>
+          <li>Very irregular use or SOL dry spells: 0–39</li>
+        </ul>
       </div>
     </div>
   );

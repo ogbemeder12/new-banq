@@ -27,7 +27,8 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
         netFlow: 0, 
         formattedInflow: '0', 
         formattedOutflow: '0',
-        score: 0
+        score: 0,
+        netFlowRatio: 0
       };
     }
 
@@ -49,25 +50,39 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
     });
 
     const netFlow = totalInflow - totalOutflow;
-    const hasTransactions = totalInflow > 0 || totalOutflow > 0;
+    const totalVolume = totalInflow + totalOutflow;
+    const hasTransactions = totalVolume > 0;
     
-    // Calculate score based on net flow - prefer positive ratios
+    // Calculate net flow ratio for scoring
+    const netFlowRatio = hasTransactions ? netFlow / totalVolume : 0;
+    
+    // Calculate score based on new algorithm
     let score = 0;
     
     if (hasTransactions) {
-      const totalVolume = totalInflow + totalOutflow;
-      const netRatio = netFlow / (totalVolume || 1);
+      // Implement new scoring algorithm:
+      // 0.3 → Score 90–100 (Strong net inflow)
+      // 0 to 0.3 → Score 60–89 (Mild accumulation)
+      // -0.3 to 0 → Score 30–59 (Net outflow but not extreme)
+      // < -0.3 → Score 0–29 (Heavy net drain)
       
-      if (netRatio >= 0.7) score = 90; // Extremely positive net flow (saving/accumulating)
-      else if (netRatio >= 0.5) score = 85;
-      else if (netRatio >= 0.3) score = 75;
-      else if (netRatio >= 0.1) score = 65;
-      else if (netRatio >= 0) score = 55; // Slightly positive
-      else if (netRatio >= -0.2) score = 45; // Slightly negative
-      else if (netRatio >= -0.4) score = 35;
-      else if (netRatio >= -0.6) score = 25;
-      else score = 15; // Very negative flow
+      if (netFlowRatio >= 0.3) {
+        // Score 90-100: Strong net inflow
+        score = 90 + Math.min(10, Math.floor((netFlowRatio - 0.3) * 100));
+      } else if (netFlowRatio >= 0) {
+        // Score 60-89: Mild accumulation
+        score = 60 + Math.min(29, Math.floor((netFlowRatio / 0.3) * 30));
+      } else if (netFlowRatio >= -0.3) {
+        // Score 30-59: Net outflow but not extreme
+        score = 30 + Math.min(29, Math.floor(((netFlowRatio + 0.3) / 0.3) * 30));
+      } else {
+        // Score 0-29: Heavy net drain
+        score = Math.max(0, Math.min(29, Math.floor((1 + netFlowRatio + 0.3) * 100)));
+      }
     }
+    
+    // Cap score at 100
+    score = Math.min(100, Math.max(0, Math.round(score)));
     
     // Formatting for display
     const formatValue = (val: number): string => {
@@ -82,11 +97,12 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
       netFlow,
       formattedInflow: formatValue(totalInflow),
       formattedOutflow: formatValue(totalOutflow),
-      score
+      score,
+      netFlowRatio
     };
   };
   
-  const { inflow, outflow, netFlow, formattedInflow, formattedOutflow, score } = calculateNetFlow();
+  const { inflow, outflow, netFlow, formattedInflow, formattedOutflow, score, netFlowRatio } = calculateNetFlow();
   const totalVolume = inflow + outflow;
   const inflowPercentage = inflow > 0 ? (inflow / totalVolume) * 100 : 0;
   const outflowPercentage = outflow > 0 ? (outflow / totalVolume) * 100 : 0;
@@ -104,6 +120,14 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
       ` ($${usdAmount.toFixed(4)})`;
   };
 
+  // Get a category label based on the net flow ratio
+  const getNetFlowCategory = () => {
+    if (netFlowRatio >= 0.3) return "Strong net inflow";
+    if (netFlowRatio >= 0) return "Mild accumulation";
+    if (netFlowRatio >= -0.3) return "Net outflow";
+    return "Heavy net drain";
+  };
+
   return (
     <div className="border rounded-lg p-4 bg-muted shadow" data-component="NetFlowAnalysis">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
@@ -113,9 +137,9 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
           className={`inline-block rounded px-3 py-1 text-sm font-bold ${
             score >= 90
               ? "bg-green-200 text-green-800"
-              : score >= 70
+              : score >= 60
               ? "bg-yellow-200 text-yellow-800"
-              : score >= 40
+              : score >= 30
               ? "bg-orange-200 text-orange-900"
               : "bg-red-200 text-red-800"
           }`}
@@ -146,7 +170,7 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
       <div className="mb-2">
         <div className="flex justify-between text-xs mb-1">
           <span>Net Flow: <span className={netFlowColor + " font-semibold"}>{netFlowFormatted} SOL</span></span>
-          {totalVolume > 0 && <span>Total Volume: {(totalVolume).toFixed(2)} SOL</span>}
+          <span>Ratio: <span className={netFlowColor + " font-semibold"}>{(netFlowRatio * 100).toFixed(1)}%</span></span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full overflow-hidden w-full">
           <div className="flex h-full">
@@ -154,10 +178,12 @@ const NetFlowAnalysis: React.FC<Props> = ({ transactions, solToUsdcRate }) => {
             <div className="bg-red-500 h-full" style={{width: `${outflowPercentage}%`}}></div>
           </div>
         </div>
+        <div className="text-xs text-right mt-1 font-medium">{getNetFlowCategory()}</div>
       </div>
       
       <div className="text-xs text-muted-foreground mt-2">
-        <p>A positive net flow indicates more assets coming in than going out, which is generally favorable for your credit score.</p>
+        <p>Score based on ratio: (Inflow-Outflow)/(Inflow+Outflow)</p>
+        <p>≥0.3: 90-100 | 0 to 0.3: 60-89 | -0.3 to 0: 30-59 | &lt;-0.3: 0-29</p>
       </div>
     </div>
   );

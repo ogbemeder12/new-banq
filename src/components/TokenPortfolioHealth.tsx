@@ -16,6 +16,8 @@ type Props = {
   transactions: Transaction[];
 };
 
+const BLUE_CHIP_TOKENS = ['SOL', 'USDC', 'USDT', 'BTC', 'ETH'];
+
 const TokenPortfolioHealth: React.FC<Props> = ({ transactions }) => {
   // Calculate token diversity and health metrics
   const calculatePortfolioMetrics = () => {
@@ -23,7 +25,8 @@ const TokenPortfolioHealth: React.FC<Props> = ({ transactions }) => {
       return {
         uniqueTokens: 0,
         primaryToken: "None",
-        diversityScore: 0,
+        blueChipPercentage: 0,
+        stablecoinCoverage: 0,
         totalTokens: 0,
         score: 0
       };
@@ -50,53 +53,74 @@ const TokenPortfolioHealth: React.FC<Props> = ({ transactions }) => {
     const uniqueTokens = sortedTokens.length;
     const primaryToken = sortedTokens.length > 0 ? sortedTokens[0].symbol : "None";
     
-    // Calculate diversity score (0-100)
-    // Higher score for more unique tokens and more even distribution
-    let diversityScore = 0;
+    // Calculate blue-chip percentage
+    const blueChipTokens = sortedTokens.filter(token => 
+      BLUE_CHIP_TOKENS.includes(token.symbol)
+    );
     
-    // Base score from unique token count
-    if (uniqueTokens >= 7) diversityScore = 50;
-    else if (uniqueTokens >= 5) diversityScore = 40;
-    else if (uniqueTokens >= 3) diversityScore = 30;
-    else if (uniqueTokens >= 2) diversityScore = 20;
-    else diversityScore = 10;
+    const blueChipCount = blueChipTokens.reduce((sum, token) => sum + token.count, 0);
+    const blueChipPercentage = totalTokenTransactions > 0 ? 
+      (blueChipCount / totalTokenTransactions) * 100 : 0;
     
-    // Adjust based on distribution - check if overly concentrated in one token
-    if (uniqueTokens > 1 && sortedTokens[0].count < totalTokenTransactions * 0.7) {
-      diversityScore += 20; // Good distribution
-    } else if (uniqueTokens > 1 && sortedTokens[0].count < totalTokenTransactions * 0.8) {
-      diversityScore += 10; // Decent distribution
+    // Calculate stablecoin coverage ratio
+    const stableTokens = sortedTokens.filter(token => 
+      ['USDC', 'USDT', 'DAI', 'BUSD'].includes(token.symbol)
+    );
+    
+    const stableCount = stableTokens.reduce((sum, token) => sum + token.count, 0);
+    const stablecoinCoverage = totalTokenTransactions > 0 ? 
+      (stableCount / totalTokenTransactions) * 100 : 0;
+    
+    // Calculate score based on Algorithm #5: Token Portfolio Health
+    let score = 0;
+    
+    // Use the higher of blue chip percentage or stablecoin coverage
+    const qualityAssetPercentage = Math.max(blueChipPercentage, stablecoinCoverage);
+    
+    // Score calculation based on the specified algorithm
+    if (qualityAssetPercentage >= 60) {
+      score = 90 + Math.min(10, (qualityAssetPercentage - 60) / 4); // 90-100
+    } else if (qualityAssetPercentage >= 40) {
+      score = 70 + (qualityAssetPercentage - 40) / 2; // 70-89
+    } else if (qualityAssetPercentage >= 20) {
+      score = 40 + (qualityAssetPercentage - 20) * 1.5; // 40-69
+    } else {
+      score = qualityAssetPercentage * 2; // 0-39
     }
-    
-    // Final portfolio score calculation
-    // Combine diversity with transaction sophistication
-    
-    // Find evidence of sophisticated token usage
-    const sophisticationBonus = transactions.some(tx => 
-      tx.type?.toLowerCase().includes('swap') || 
-      tx.type?.toLowerCase().includes('yield') ||
-      tx.type?.toLowerCase().includes('stake')
-    ) ? 15 : 0;
-    
-    // Calculate final score
-    const finalScore = Math.min(100, diversityScore + sophisticationBonus + 15); // Add base points
     
     return {
       uniqueTokens,
       primaryToken,
-      diversityScore,
+      blueChipPercentage,
+      stablecoinCoverage,
       totalTokens: totalTokenTransactions,
-      score: finalScore
+      score: Math.round(score)
     };
   };
   
-  const { uniqueTokens, primaryToken, totalTokens, score } = calculatePortfolioMetrics();
+  const { 
+    uniqueTokens, 
+    primaryToken, 
+    totalTokens, 
+    score, 
+    blueChipPercentage, 
+    stablecoinCoverage 
+  } = calculatePortfolioMetrics();
   
   // Calculate top token percentage
   const topTokenPct = transactions.length > 0 ? 
     Math.round(transactions.filter(tx => 
       tx.currency?.toUpperCase() === primaryToken
     ).length / Math.max(1, transactions.length) * 100) : 0;
+
+  // For logging purposes
+  console.log("TokenPortfolioHealth Metrics:", { 
+    uniqueTokens, 
+    primaryToken, 
+    score, 
+    blueChipPercentage: Math.round(blueChipPercentage),
+    stablecoinCoverage: Math.round(stablecoinCoverage)
+  });
 
   return (
     <div className="border rounded-lg p-4 bg-muted shadow" data-component="TokenPortfolio">
@@ -124,25 +148,26 @@ const TokenPortfolioHealth: React.FC<Props> = ({ transactions }) => {
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-background/50 p-3 rounded-md">
+          <h5 className="text-sm font-medium text-muted-foreground">Blue-Chip %</h5>
+          <p className="text-xl font-bold">{Math.round(blueChipPercentage)}%</p>
+          <p className="text-xs text-muted-foreground">SOL, USDC, USDT, etc.</p>
+        </div>
+        
+        <div className="bg-background/50 p-3 rounded-md">
+          <h5 className="text-sm font-medium text-muted-foreground">Stablecoin Coverage</h5>
+          <p className="text-xl font-bold">{Math.round(stablecoinCoverage)}%</p>
+        </div>
+        
+        <div className="bg-background/50 p-3 rounded-md">
           <h5 className="text-sm font-medium text-muted-foreground">Unique Tokens</h5>
           <p className="text-xl font-bold">{uniqueTokens} <span className="text-xs font-normal text-muted-foreground">tokens</span></p>
-        </div>
-        
-        <div className="bg-background/50 p-3 rounded-md">
-          <h5 className="text-sm font-medium text-muted-foreground">Primary Token</h5>
-          <p className="text-xl font-bold">{primaryToken} <span className="text-xs font-normal text-muted-foreground">{topTokenPct}%</span></p>
-        </div>
-        
-        <div className="bg-background/50 p-3 rounded-md">
-          <h5 className="text-sm font-medium text-muted-foreground">Total Txs</h5>
-          <p className="text-xl font-bold">{totalTokens} <span className="text-xs font-normal text-muted-foreground">transactions</span></p>
         </div>
       </div>
       
       <div className="mt-3 space-y-2">
         <div>
           <div className="flex justify-between items-center mb-1">
-            <span className="text-xs text-muted-foreground">Diversity Score</span>
+            <span className="text-xs text-muted-foreground">Portfolio Health Score</span>
             <span className="text-xs">{score}/100</span>
           </div>
           <Progress value={score} className="h-1.5" />
@@ -150,7 +175,12 @@ const TokenPortfolioHealth: React.FC<Props> = ({ transactions }) => {
       </div>
       
       <div className="mt-3 text-xs text-muted-foreground">
-        <p>A diverse token portfolio with a history of sophisticated token usage improves your credit score.</p>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>60%+ blue-chips or stables: 90–100</li>
+          <li>40–60% quality assets: 70–89</li>
+          <li>20–40% quality assets: 40–69</li>
+          <li>&lt;20% quality assets: 0–39</li>
+        </ul>
       </div>
     </div>
   );
