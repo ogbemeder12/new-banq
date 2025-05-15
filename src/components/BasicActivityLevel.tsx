@@ -23,21 +23,14 @@ function calculateActivityScore(transactions: Transaction[]) {
     };
   }
 
-  console.log(`Calculating activity score based on ${transactions.length} real transactions from Helius API`);
+  console.log(`Calculating activity score based on ${transactions.length} transactions`);
 
-  // Filter out transactions without valid numerical amounts
-  const validTransactions = transactions.filter(tx => {
-    const amount = typeof tx.amount === 'string' ? 
-      parseFloat(tx.amount.replace(/[^\d.-]/g, '')) : 
-      (typeof tx.amount === 'number' ? tx.amount : 0);
-    
-    return !isNaN(amount) && amount !== 0;
-  });
-
-  const totalTransactions = validTransactions.length;
+  // Count total valid transactions
+  const totalTransactions = transactions.length;
+  
+  // Calculate score based on Algorithm #9: Basic Activity Level
   let score = 0;
-
-  // Calculate score based on transaction count
+  
   if (totalTransactions >= 1000) {
     score = 100;
   } else if (totalTransactions >= 500) {
@@ -57,7 +50,6 @@ function calculateActivityScore(transactions: Transaction[]) {
 }
 
 const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
-  // Real data coming from props, no mock data
   const { totalTransactions, score } = calculateActivityScore(transactions);
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedTransactions, setAnimatedTransactions] = useState(0);
@@ -110,6 +102,11 @@ const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
     }
   }, [totalTransactions]);
 
+  console.log("BasicActivityLevel Metrics:", {
+    totalTransactions,
+    score
+  });
+
   return (
     <Card className="bg-muted shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -126,6 +123,7 @@ const BasicActivityLevel: React.FC<Props> = ({ transactions }) => {
                 ? "bg-orange-200 text-orange-900"
                 : "bg-red-200 text-red-800"
             }`}
+            data-score={score}
           >
             Score: {animatedScore}
           </span>

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,11 +9,13 @@ import WalletLookup from "./pages/WalletLookup";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import { WalletProvider } from "./contexts/WalletContext";
+import { Images } from "lucide-react";
+import MyMeme from "./components/MyMeme.tsx";
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={queryClient}> 
     <TooltipProvider>
       <WalletProvider>
         <Toaster />
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/signup" element={<SignUp />} />
             <Route path="/wallet-lookup" element={<WalletLookup />} />
             <Route path="/index" element={<Index />} />
+            <Route path="/my-memes" element={<MyMeme />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

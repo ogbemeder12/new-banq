@@ -510,6 +510,207 @@ const calculateRetentionBehavior = (transactions: any[]): ScoreMetric => {
   };
 };
 
+// Calculate staking behavior based on actual staking activities from API
+const calculateStakingBehavior = (stakingActivities: any[]): ScoreMetric => {
+  if (!stakingActivities || stakingActivities.length === 0) {
+    return {
+      title: "Staking & Farming Engagement",
+      description: "Level of participation in staking and farming",
+      score: "No Data",
+      percentage: 0
+    };
+  }
+
+  // Process actual staking data from API
+  const activeStakes = stakingActivities.filter(activity =>
+    activity.type === 'stake' && activity.status === 'active'
+  );
+
+  const totalStakedAmount = activeStakes.reduce((sum, stake) =>
+    sum + (parseFloat(stake.amount) || 0), 0
+  );
+
+  const uniqueValidators = new Set(
+    activeStakes.map(stake => stake.validatorAddress)
+  ).size;
+
+  // Calculate average stake duration in days
+  const avgStakeDuration = activeStakes.reduce((sum, stake) => {
+    const startTime = stake.timestamp || stake.blockTime || 0;
+    const duration = (Date.now() / 1000 - startTime) / (24 * 60 * 60); // Convert to days
+    return sum + duration;
+  }, 0) / Math.max(activeStakes.length, 1);
+
+  // Score based on actual staking metrics
+  let score = "20";
+  let percentage = 20;
+
+  // Scoring logic based on actual stake data
+  if (totalStakedAmount >= 100 && uniqueValidators >= 3 && avgStakeDuration >= 90) {
+    score = "95";
+    percentage = 95;
+  } else if (totalStakedAmount >= 50 && uniqueValidators >= 2 && avgStakeDuration >= 30) {
+    score = "75";
+    percentage = 75;
+  } else if (totalStakedAmount >= 10 && uniqueValidators >= 1 && avgStakeDuration >= 7) {
+    score = "50";
+    percentage = 50;
+  } else if (totalStakedAmount > 0) {
+    score = "30";
+    percentage = 30;
+  }
+
+  return {
+    title: "Staking & Farming Engagement",
+    description: `Active stakes: ${activeStakes.length}, Validators: ${uniqueValidators}`,
+    score,
+    percentage
+  };
+};
+
+// Calculate borrowing behavior based on actual transaction data
+const calculateBorrowingBehavior = (transactions: any[]): ScoreMetric => {
+  if (!transactions || transactions.length === 0) {
+    return {
+      title: "Borrowing Behavior",
+      description: "Management of loans and borrowed assets",
+      score: "No Data",
+      percentage: 0
+    };
+  }
+
+  // Process actual transaction data from API
+  const borrowTxs = transactions.filter(tx => {
+    const program = tx.program?.toLowerCase() || '';
+    const type = tx.type?.toLowerCase() || '';
+    return (
+      program.includes('lending') ||
+      program.includes('aave') ||
+      program.includes('compound') ||
+      type.includes('borrow') ||
+      type.includes('repay')
+    );
+  });
+
+  const borrowEvents = borrowTxs.filter(tx =>
+    tx.type?.toLowerCase().includes('borrow')
+  );
+
+  const repayEvents = borrowTxs.filter(tx =>
+    tx.type?.toLowerCase().includes('repay')
+  );
+
+  const totalBorrowed = borrowEvents.reduce((sum, tx) =>
+    sum + (parseFloat(tx.amount) || 0), 0
+  );
+
+  const totalRepaid = repayEvents.reduce((sum, tx) =>
+    sum + (parseFloat(tx.amount) || 0), 0
+  );
+
+  // Calculate repayment ratio
+  const repaymentRatio = totalBorrowed > 0 ? totalRepaid / totalBorrowed : 0;
+
+  // Score based on actual borrowing metrics
+  let score = "50";
+  let percentage = 50;
+
+  if (totalBorrowed > 0 && repaymentRatio >= 0.95) {
+    score = "95";
+    percentage = 95;
+  } else if (totalBorrowed > 0 && repaymentRatio >= 0.8) {
+    score = "75";
+    percentage = 75;
+  } else if (totalBorrowed > 0 && repaymentRatio >= 0.6) {
+    score = "50";
+    percentage = 50;
+  } else if (totalBorrowed > 0) {
+    score = "30";
+    percentage = 30;
+  }
+
+  return {
+    title: "Borrowing Behavior",
+    description: `Borrow events: ${borrowEvents.length}, Repay events: ${repayEvents.length}`,
+    score,
+    percentage
+  };
+};
+
+// Calculate collateral management based on actual transaction data
+const calculateCollateralManagement = (transactions: any[]): ScoreMetric => {
+  if (!transactions || transactions.length === 0) {
+    return {
+      title: "Collateral Management",
+      description: "How well you manage collateralized positions",
+      score: "No Data",
+      percentage: 0
+    };
+  }
+
+  // Process actual transaction data from API
+  const collateralTxs = transactions.filter(tx => {
+    const program = tx.program?.toLowerCase() || '';
+    const type = tx.type?.toLowerCase() || '';
+    return (
+      program.includes('lending') ||
+      type.includes('deposit') ||
+      type.includes('withdraw') ||
+      type.includes('collateral')
+    );
+  });
+
+  const deposits = collateralTxs.filter(tx =>
+    tx.type?.toLowerCase().includes('deposit')
+  );
+
+  const withdrawals = collateralTxs.filter(tx =>
+    tx.type?.toLowerCase().includes('withdraw')
+  );
+
+  const liquidations = collateralTxs.filter(tx =>
+    tx.type?.toLowerCase().includes('liquidation')
+  );
+
+  const totalDeposited = deposits.reduce((sum, tx) =>
+    sum + (parseFloat(tx.amount) || 0), 0
+  );
+
+  const totalWithdrawn = withdrawals.reduce((sum, tx) =>
+    sum + (parseFloat(tx.amount) || 0), 0
+  );
+
+  // Calculate health metrics
+  const hasLiquidations = liquidations.length > 0;
+  const collateralRatio = totalDeposited > 0 ?
+    (totalDeposited - totalWithdrawn) / totalDeposited : 0;
+
+  // Score based on actual collateral metrics
+  let score = "50";
+  let percentage = 50;
+
+  if (totalDeposited > 0 && !hasLiquidations && collateralRatio >= 0.8) {
+    score = "95";
+    percentage = 95;
+  } else if (totalDeposited > 0 && !hasLiquidations && collateralRatio >= 0.6) {
+    score = "75";
+    percentage = 75;
+  } else if (totalDeposited > 0 && collateralRatio >= 0.4) {
+    score = "50";
+    percentage = 50;
+  } else if (hasLiquidations || (totalDeposited > 0 && collateralRatio < 0.4)) {
+    score = "30";
+    percentage = 30;
+  }
+
+  return {
+    title: "Collateral Management",
+    description: `Deposits: ${deposits.length}, Withdrawals: ${withdrawals.length}${hasLiquidations ? ', Has liquidations' : ''}`,
+    score,
+    percentage
+  };
+};
+
 const WalletLookup = () => {
   const [input, setInput] = useState<string>("");
   const [balance, setBalance] = useState<{ amount: number; currency: string } | null>(null);
@@ -590,6 +791,9 @@ const WalletLookup = () => {
       const strategicToolUsage = calculateStrategicToolUsage(transactions);
       const basicActivityLevel = calculateBasicActivityLevel(transactions);
       const retentionBehavior = calculateRetentionBehavior(transactions);
+      const stakingBehavior = calculateStakingBehavior(stakingActivities);
+      const borrowingBehavior = calculateBorrowingBehavior(transactions);
+      const collateralManagement = calculateCollateralManagement(transactions);
       
       // Update the score insights
       setScoreInsights([
@@ -600,10 +804,13 @@ const WalletLookup = () => {
         creditMix,
         strategicToolUsage,
         basicActivityLevel,
-        retentionBehavior
+        retentionBehavior,
+        stakingBehavior,
+        borrowingBehavior,
+        collateralManagement
       ]);
     }
-  }, [transactions, balance]);
+  }, [transactions, balance, stakingActivities]);
 
   useEffect(() => {
     // Calculate a synthetic credit score when transactions are loaded
@@ -981,7 +1188,7 @@ const WalletLookup = () => {
           <Card className="w-full max-w-md bg-[#1a1130] border-purple-900/50">
             <CardContent className="pt-6">
               <div className="text-center mb-4">
-                <h2 className="text-2xl font-bold text-purple-300">Connect Your Wallet</h2>
+                {/* <h2 className="text-2xl font-bold text-purple-300">Connect Your Wallet</h2> */}
                 <p className="text-sm text-gray-400">Enter your Solana wallet to see your credit score</p>
               </div>
 
@@ -1093,12 +1300,6 @@ const WalletLookup = () => {
                   </Button>
                 </div>
               </div>
-              {balance && (
-                <div className="text-right">
-                  <p className="text-sm text-gray-400">Balance</p>
-                  <p className="text-lg font-semibold">{balance.amount.toFixed(4)} {balance.currency}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -1317,19 +1518,6 @@ const WalletLookup = () => {
                   <Link className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-2 rounded-full flex items-center justify-center" to="/signup">
                     <button className="text-center">create profile</button>
                   </Link>
-
-                  {/* Additional cards for strategic tool usage and collateral management */}
-                  {/* <div className="grid gap-4 mt-6">
-                    <CollateralManagement
-                      transactions={transactions}
-                    />
-                    <TokenPortfolioHealth
-                      transactions={transactions}
-                    />
-                    <StrategicToolUsage
-                      transactions={transactions}
-                    />
-                  </div> */}
                 </div>
               </CardContent>
             </Card>

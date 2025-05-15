@@ -1,4 +1,3 @@
-
 import React from "react";
 import { useState, useEffect } from "react";
 import {
@@ -76,18 +75,48 @@ const ShareCreditScore: React.FC<ShareCreditScoreProps> = ({
   };
 
   const handleTweet = () => {
-    const tweetText = `My Branq Credit Score: ${creditScore} (${scoreStatus}) - Check yours at branq.xyz`;
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-    window.open(url, '_blank');
+    if (memeImage) {
+      // Get the full URL for the meme image
+      const imageUrl = window.location.origin + memeImage;
+
+      // Create tweet text with image
+      const tweetText = `My Branq Credit Score: ${creditScore} (${scoreStatus}) - Check yours at branq.xyz`;
+
+      // Use Twitter Web Intent with image
+      const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}&url=${encodeURIComponent(imageUrl)}`;
+      window.open(url, '_blank');
+    } else {
+    // Fallback if no image is available
+      const tweetText = `My Branq Credit Score: ${creditScore} (${scoreStatus}) - Check yours at branq.xyz`;
+      const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
+      window.open(url, '_blank');
+    }
   };
 
+  // const handleSave = () => {
+  //   // In a real app, this would generate and download an image
+  //   toast({
+  //     title: "Image saved",
+  //     description: "Your credit score card has been saved"
+  //   });
+  // };
+
   const handleSave = () => {
-    // In a real app, this would generate and download an image
+  if (memeImage) {
+    const link = document.createElement('a');
+    link.href = memeImage;
+    link.download = "branq-credit-score.jpg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
     toast({
       title: "Image saved",
-      description: "Your credit score card has been saved"
+      description: "Your credit score card has been saved",
     });
-  };
+  }
+};
+
 
   const getStatusColor = () => {
     switch(scoreStatus) {

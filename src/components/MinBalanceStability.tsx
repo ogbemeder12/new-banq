@@ -1,7 +1,7 @@
-
 import React from "react";
 import { LineChart, Line, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { CreditCard, TrendingUp, CircleDollarSign } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 type Transaction = {
   signature?: string;
@@ -19,7 +19,7 @@ const MinBalanceStability: React.FC<Props> = ({ transactions, currentBalance }) 
   // Calculate metrics based on transactions
   const calculateMetrics = () => {
     if (!transactions || transactions.length === 0) {
-      return { score: 0, minBalance: 0, avgBalance: 0, balanceHistory: [] };
+      return { score: 0, minBalance: 0, avgBalance: 0, minBalanceRatio: 0, balanceHistory: [] };
     }
     
     // Sort transactions by timestamp
@@ -70,39 +70,50 @@ const MinBalanceStability: React.FC<Props> = ({ transactions, currentBalance }) 
     // Calculate average balance
     const avgBalance = dataPoints > 0 ? totalBalance / dataPoints : 0;
     
-    // Calculate score based on minimum balance stability
-    // Higher score for higher minimum balance relative to average
-    const minToAvgRatio = avgBalance > 0 ? minBalance / avgBalance : 0;
+    // Calculate minimum balance ratio
+    // Metric: Average Daily Minimum Balance / Total Wallet Value
+    const minBalanceRatio = avgBalance > 0 ? minBalance / avgBalance : 0;
     
+    // Calculate score based on new algorithm:
+    // 50% → Score 90–100
+    // 30–50% → Score 70–89
+    // 10–30% → Score 40–69
+    // < 10% → Score 0–39
     let score = 0;
-    if (minToAvgRatio >= 0.9) score = 95; // Very stable, minimum very close to average
-    else if (minToAvgRatio >= 0.75) score = 85;
-    else if (minToAvgRatio >= 0.5) score = 75;
-    else if (minToAvgRatio >= 0.25) score = 60;
-    else if (minToAvgRatio >= 0.1) score = 40;
-    else if (minToAvgRatio > 0) score = 30;
-    else score = 20; // Minimum went to zero or negative
     
-    // Boost score if current balance is significantly higher than minimum
-    const growthRatio = minBalance > 0 ? currentBalance / minBalance : 0;
-    if (growthRatio >= 5) score = Math.min(score + 15, 100);
-    else if (growthRatio >= 2) score = Math.min(score + 10, 100);
-    else if (growthRatio >= 1.5) score = Math.min(score + 5, 100);
+    if (minBalanceRatio >= 0.5) {
+      // 50% → Score 90–100
+      score = 90 + Math.min(10, Math.floor((minBalanceRatio - 0.5) * 100));
+    } else if (minBalanceRatio >= 0.3) {
+      // 30–50% → Score 70–89
+      score = 70 + Math.min(19, Math.floor((minBalanceRatio - 0.3) * 100));
+    } else if (minBalanceRatio >= 0.1) {
+      // 10–30% → Score 40–69
+      score = 40 + Math.min(29, Math.floor((minBalanceRatio - 0.1) * 150));
+    } else {
+      // < 10% → Score 0–39
+      score = Math.min(39, Math.floor(minBalanceRatio * 390));
+    }
+    
+    // Ensure score is in valid range
+    score = Math.round(Math.min(100, Math.max(0, score)));
     
     return {
       score,
       minBalance,
       avgBalance,
+      minBalanceRatio,
       balanceHistory: balanceHistory.slice(-10) // Just use last 10 points for chart
     };
   };
   
-  const { score, minBalance, avgBalance, balanceHistory } = calculateMetrics();
+  const { score, minBalance, avgBalance, minBalanceRatio, balanceHistory } = calculateMetrics();
   
   // Format for display
   const formattedMin = minBalance.toFixed(4);
   const formattedAvg = avgBalance.toFixed(4);
   const formattedCurrent = currentBalance.toFixed(4);
+  const formattedRatio = (minBalanceRatio * 100).toFixed(1);
   
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -113,6 +124,14 @@ const MinBalanceStability: React.FC<Props> = ({ transactions, currentBalance }) 
       );
     }
     return null;
+  };
+
+  // Get category based on min balance ratio
+  const getBalanceCategory = () => {
+    if (minBalanceRatio >= 0.5) return "Excellent stability (≥50%)";
+    if (minBalanceRatio >= 0.3) return "Good stability (30-50%)";
+    if (minBalanceRatio >= 0.1) return "Moderate stability (10-30%)";
+    return "Low stability (<10%)";
   };
 
   return (
@@ -171,8 +190,20 @@ const MinBalanceStability: React.FC<Props> = ({ transactions, currentBalance }) 
         </div>
       </div>
       
+      <div className="mt-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Minimum/Average Ratio:</span>
+          <span className="text-xs font-medium">{formattedRatio}%</span>
+        </div>
+        <div className="mt-1">
+          <Progress value={minBalanceRatio * 100} className="h-1" />
+        </div>
+        <div className="text-xs text-right mt-1 font-medium">{getBalanceCategory()}</div>
+      </div>
+      
       <div className="mt-3 text-xs text-muted-foreground">
-        <p>Higher scores are awarded for maintaining consistent minimum balances without dipping too low.</p>
+        <p>Score based on Min Balance / Avg Balance ratio:</p>
+        <p>≥50%: 90-100 | 30-50%: 70-89 | 10-30%: 40-69 | &lt;10%: 0-39</p>
       </div>
     </div>
   );
